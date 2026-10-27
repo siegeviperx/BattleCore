@@ -1,0 +1,14 @@
+# Netlify config for the browser client. Set VITE_SERVER_URL (e.g. wss://battlecore-server.fly.dev)
+# under Site configuration > Environment variables so online play reaches the Fly.io server.
+[build]
+  base = "client"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

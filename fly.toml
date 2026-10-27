@@ -1,0 +1,26 @@
+# Fly.io config for the game server. Rename `app` to your app's name (fly launch will offer to).
+app = "battlecore-server"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Rooms live in memory: never stop the machine (it would end every game in progress)
+  # and never run more than one (players on different machines couldn't see each other's rooms).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
