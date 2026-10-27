@@ -20,19 +20,19 @@
   "pieces": {
     "w": {
       "p": { "name": "Baby Rifleman", "icon": "👶", "art": "pieces/w-p.png" },
-      "n": { "name": "Jetpack Baby", "icon": "🚀" },
-      "b": { "name": "Sniper Baby", "icon": "🎯" },
-      "r": { "name": "Baby Watchtower", "icon": "🏰" },
-      "q": { "name": "Caped Baby Queen", "icon": "👸" },
-      "k": { "name": "Baby Commander", "icon": "🤴" }
+      "n": { "name": "Jetpack Baby", "icon": "🚀", "art": "pieces/w-n.png" },
+      "b": { "name": "Sniper Baby", "icon": "🎯", "art": "pieces/w-b.png" },
+      "r": { "name": "Baby Watchtower", "icon": "🏰", "art": "pieces/w-r.png" },
+      "q": { "name": "Caped Baby Queen", "icon": "👸", "art": "pieces/w-q.png" },
+      "k": { "name": "Baby Commander", "icon": "🤴", "art": "pieces/w-k.png" }
     },
     "b": {
       "p": { "name": "Raptor Trooper", "icon": "🦎", "art": "pieces/b-p.png" },
-      "n": { "name": "Ptero Gunship", "icon": "🦅" },
-      "b": { "name": "Trike Tank", "icon": "🦏" },
-      "r": { "name": "Dino Fortress", "icon": "🏯" },
-      "q": { "name": "Spinosaurus", "icon": "🐊" },
-      "k": { "name": "Armored T-Rex", "icon": "🦖" }
+      "n": { "name": "Ptero Gunship", "icon": "🦅", "art": "pieces/b-n.png" },
+      "b": { "name": "Trike Tank", "icon": "🦏", "art": "pieces/b-b.png" },
+      "r": { "name": "Dino Fortress", "icon": "🏯", "art": "pieces/b-r.png" },
+      "q": { "name": "Spinosaurus", "icon": "🐊", "art": "pieces/b-q.png" },
+      "k": { "name": "Armored T-Rex", "icon": "🦖", "art": "pieces/b-k.png" }
     }
   },
   "glyphs": { "p": "♟", "n": "♞", "b": "♝", "r": "♜", "q": "♛", "k": "♚" }
