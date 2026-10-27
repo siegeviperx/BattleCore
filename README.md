@@ -9,6 +9,7 @@ plays an animated 3D fight scene.
 ![Concept](docs/concept/baby-army-vs-armored-dinosaurs.png)
 
 - **Design doc:** [docs/DESIGN.md](docs/DESIGN.md)
+- **Technical requirements:** [docs/TECHNICAL_REQUIREMENTS.md](docs/TECHNICAL_REQUIREMENTS.md)
 - **Modes:** vs Computer · Local 2-Player · Online
 - **Stack:** TypeScript · Vite · Three.js · chess.js · custom alpha-beta AI · Node WebSocket server
 
