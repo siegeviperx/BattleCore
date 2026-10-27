@@ -1,4 +1,4 @@
-import type { Color, Level, PieceType } from '../core/types';
+import type { Color, FightMode, Level, PieceType } from '../core/types';
 
 export type OnlineRequest =
   | { action: 'create'; side: Color | 'random' }
@@ -11,6 +11,8 @@ export interface MenuChoice {
   level?: Level;
   /** Local 2P: rotate the camera to face the side to move. */
   autoRotate: boolean;
+  /** How captures play out on this screen (online: only affects this player's view). */
+  fights: FightMode;
   /** Online only. */
   online?: OnlineRequest;
 }

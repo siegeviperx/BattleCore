@@ -10,11 +10,22 @@ const BASE_DIST = Math.hypot(8.5, 9);
 /** Half-width (world units) that must fit horizontally. */
 const HALF_WIDTH = 5.0;
 
+/** A scripted camera shot (fight scenes). Mutate `pos`/`target`; the rig applies them every frame. */
+export interface Shot {
+  pos: THREE.Vector3;
+  target: THREE.Vector3;
+  /** Where the orbit camera was when the shot began. */
+  readonly home: { pos: THREE.Vector3; target: THREE.Vector3 };
+}
+
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: OrbitControls;
   private side: Color = 'w';
   private animating = false;
+  private shot: Shot | null = null;
+  /** Camera shake amplitude (world units) during a shot. */
+  shakeAmp = 0;
 
   constructor(dom: HTMLElement, private tw: Tweener) {
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
@@ -95,12 +106,45 @@ export class CameraRig {
       .then(() => {
         if (this.side !== mySide) return;
         this.animating = false;
-        this.controls.enabled = true;
+        this.controls.enabled = !this.shot;
         this.controls.update();
       });
   }
 
+  /** Take the camera off the orbit controls for a scripted shot, starting from the current view. */
+  beginShot(): Shot {
+    this.endShot();
+    const pos = this.camera.position.clone();
+    const target = this.controls.target.clone();
+    this.shot = { pos, target, home: { pos: pos.clone(), target: target.clone() } };
+    this.controls.enabled = false;
+    return this.shot;
+  }
+
+  /** Snap back to where the shot began and hand control back to the player. */
+  endShot(): void {
+    const s = this.shot;
+    if (!s) return;
+    this.shot = null;
+    this.shakeAmp = 0;
+    this.camera.position.copy(s.home.pos);
+    this.controls.target.copy(s.home.target);
+    this.camera.lookAt(s.home.target);
+    this.controls.enabled = !this.animating;
+  }
+
   update(): void {
+    const s = this.shot;
+    if (s) {
+      const k = this.shakeAmp;
+      this.camera.position.set(
+        s.pos.x + (Math.random() - 0.5) * k,
+        s.pos.y + (Math.random() - 0.5) * k,
+        s.pos.z + (Math.random() - 0.5) * k,
+      );
+      this.camera.lookAt(s.target);
+      return;
+    }
     if (!this.animating) this.controls.update();
   }
 }

@@ -1,6 +1,6 @@
 import './hud.css';
 import data from '../data/pieces.json';
-import type { Color, Level, PieceType } from '../core/types';
+import type { Color, FightMode, Level, PieceType } from '../core/types';
 import type { BannerKind, Hud, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
 
 export type { Hud, MenuChoice, BannerKind, Lobby, OnlineRequest, OpponentStatus } from './types';
@@ -26,6 +26,11 @@ const LEVELS: { id: Level; label: string; hint: string }[] = [
   { id: 'medium', label: 'Medium', hint: 'Soldier' },
   { id: 'hard', label: 'Hard', hint: 'Veteran' },
   { id: 'max', label: 'Max', hint: 'General' },
+];
+const FIGHT_MODES: { id: FightMode; label: string; hint: string }[] = [
+  { id: 'full', label: 'Full', hint: 'Every capture' },
+  { id: 'quick', label: 'Quick', hint: 'Short & sharp' },
+  { id: 'off', label: 'Off', hint: 'Just poof' },
 ];
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
 const PROMO_KEYS: Record<string, PieceType> = { q: 'q', r: 'r', b: 'b', n: 'n' };
@@ -120,6 +125,7 @@ interface Saved {
   humanColor: Color;
   level: Level;
   autoRotate: boolean;
+  fights: FightMode;
   onlineAction: 'create' | 'join';
   onlineSide: OnlineSide;
 }
@@ -129,6 +135,7 @@ const DEFAULTS: Saved = {
   humanColor: 'w',
   level: 'medium',
   autoRotate: true,
+  fights: 'full',
   onlineAction: 'create',
   onlineSide: 'random',
 };
@@ -143,6 +150,7 @@ function loadSaved(): Saved {
       humanColor: p.humanColor === 'b' ? 'b' : 'w',
       level: LEVELS.some((l) => l.id === p.level) ? (p.level as Level) : DEFAULTS.level,
       autoRotate: typeof p.autoRotate === 'boolean' ? p.autoRotate : DEFAULTS.autoRotate,
+      fights: FIGHT_MODES.some((f) => f.id === p.fights) ? (p.fights as FightMode) : DEFAULTS.fights,
       onlineAction: p.onlineAction === 'join' ? 'join' : 'create',
       onlineSide: p.onlineSide === 'w' || p.onlineSide === 'b' ? p.onlineSide : 'random',
     };
@@ -465,6 +473,25 @@ export function createHud(root: HTMLElement): Hud {
         el('div', 'bc-field', undefined, el('div', 'bc-field__label', undefined, 'Difficulty'), el('div', 'bc-seg', { role: 'group', 'aria-label': 'Difficulty' }, ...levelBtns)),
       );
 
+      const fightBtns = FIGHT_MODES.map((f) =>
+        button(
+          'bc-seg__btn',
+          [el('span', 'bc-seg__label', undefined, f.label), el('span', 'bc-seg__hint', undefined, f.hint)],
+          () => {
+            state.fights = f.id;
+            sync();
+          },
+          { 'aria-pressed': 'false', 'data-fights': f.id },
+        ),
+      );
+      const fightOptions = el(
+        'div',
+        'bc-field bc-field--fights',
+        undefined,
+        el('div', 'bc-field__label', undefined, 'Capture fights'),
+        el('div', 'bc-seg bc-seg--3', { role: 'group', 'aria-label': 'Capture fights' }, ...fightBtns),
+      );
+
       const rotateInput = el('input', 'bc-switch__input', { type: 'checkbox', role: 'switch' });
       rotateInput.addEventListener('change', () => {
         state.autoRotate = rotateInput.checked;
@@ -587,12 +614,13 @@ export function createHud(root: HTMLElement): Hud {
         if (!canDeploy()) return;
         save(state);
         let choice: MenuChoice;
-        if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false };
-        else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate };
+        const fights = state.fights;
+        if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false, fights };
+        else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate, fights };
         else {
           const online: OnlineRequest =
             state.onlineAction === 'join' ? { action: 'join', code: joinCode } : { action: 'create', side: state.onlineSide };
-          choice = { mode: 'online', autoRotate: false, online };
+          choice = { mode: 'online', autoRotate: false, fights, online };
         }
         close();
         resolve(choice);
@@ -606,6 +634,7 @@ export function createHud(root: HTMLElement): Hud {
         aiOptions,
         localOptions,
         onlineOptions,
+        fightOptions,
         deployBtn,
       );
 
@@ -647,6 +676,7 @@ export function createHud(root: HTMLElement): Hud {
         for (const c of ['w', 'b'] as Color[]) sideBtns[c].setAttribute('aria-pressed', String(state.humanColor === c));
         for (const b of levelBtns) b.setAttribute('aria-pressed', String(b.dataset.level === state.level));
         rotateInput.checked = state.autoRotate;
+        for (const b of fightBtns) b.setAttribute('aria-pressed', String(b.dataset.fights === state.fights));
       }
 
       function onKey(e: KeyboardEvent): void {

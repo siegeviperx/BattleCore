@@ -34,7 +34,7 @@ interface OnlineSession {
 
 export class Controller {
   private game = new Game();
-  private choice: MenuChoice = { mode: 'local', autoRotate: true };
+  private choice: MenuChoice = { mode: 'local', autoRotate: true, fights: 'full' };
   private selected: Square | null = null;
   private targets: MoveTarget[] = [];
   private animating = false;
@@ -74,6 +74,7 @@ export class Controller {
     this.leaveOnline();
     this.choice = await this.hud.showMenu();
     this.inMenu = false;
+    this.board.setFightMode(this.choice.fights);
     if (this.choice.mode === 'online' && this.choice.online) void this.startOnline(this.choice.online);
     else this.newGame();
   }

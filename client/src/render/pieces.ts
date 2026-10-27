@@ -3,9 +3,10 @@ import type { BoardPiece, Color, MoveAnim, PieceType, Square } from '../core/typ
 import data from '../data/pieces.json';
 import { BOARD_Y, squareToFR, squareToXZ } from './coords';
 import { CUTOUT_ASPECT, cutoutHit, getBaseTopTexture, getCutout, hasArt } from './cutouts';
+import { burst } from '../fight/fx';
 import { ease, Tweener } from './tween';
 
-const BASE_H = 0.16;
+export const BASE_H = 0.16;
 const BASE_R_TOP = 0.35;
 const BASE_R_BOTTOM = 0.38;
 
@@ -120,7 +121,10 @@ export class PieceObj {
   }
 }
 
-const puffGeo = new THREE.IcosahedronGeometry(0.17, 1);
+type XZ = { x: number; z: number };
+
+/** Plays a capture as a fight scene instead of the plain hop + poof. The handler removes the victim. */
+export type FightHandler = (m: MoveAnim, mover: PieceObj, victim: PieceObj) => Promise<void>;
 
 export class PieceLayer {
   readonly group = new THREE.Group();
@@ -129,6 +133,7 @@ export class PieceLayer {
   private fx = new THREE.Group();
   /** Bumped by setPosition so in-flight animations stop touching the scene. */
   private gen = 0;
+  private fight: FightHandler | null = null;
 
   constructor(private tw: Tweener) {
     this.group.add(this.fx);
@@ -150,6 +155,26 @@ export class PieceLayer {
       this.bySquare.set(bp.square, p);
       this.group.add(p.root);
     }
+  }
+
+  setFightHandler(fn: FightHandler | null): void {
+    this.fight = fn;
+  }
+
+  get generation(): number {
+    return this.gen;
+  }
+
+  pieces(): Iterable<PieceObj> {
+    return this.all;
+  }
+
+  /** Remove a piece from the board right away (no effect). */
+  discard(p: PieceObj): void {
+    this.group.remove(p.root);
+    this.all.delete(p);
+    if (this.bySquare.get(p.square) === p) this.bySquare.delete(p.square);
+    p.dispose();
   }
 
   at(sq: Square): PieceObj | undefined {
@@ -214,42 +239,42 @@ export class PieceLayer {
       }
     }
 
+    const promote = async () => {
+      if (gen !== this.gen) return;
+      if (m.promotion && m.promotion !== mover.type) {
+        mover.setType(m.promotion);
+        await this.pop(mover);
+      }
+    };
+    if (victim && this.fight) {
+      await this.fight(m, mover, victim);
+      await promote();
+      return;
+    }
+
     const hopDur = this.hopDuration(m.from, m.to);
-    jobs.push(
-      this.hop(mover, m.from, m.to, 0).then(async () => {
-        if (gen !== this.gen) return;
-        if (m.promotion && m.promotion !== mover.type) {
-          mover.setType(m.promotion);
-          await this.pop(mover);
-        }
-      }),
-    );
+    jobs.push(this.hop(mover, squareToXZ(m.from), squareToXZ(m.to), 0).then(promote));
     if (victim) {
       const v = victim;
       const poofDur = 0.42;
       jobs.push(this.poof(v, Math.max(0, hopDur - poofDur), poofDur));
     }
-    if (rook && m.rookMove) jobs.push(this.hop(rook, m.rookMove.from, m.rookMove.to, hopDur * 0.55));
+    if (rook && m.rookMove) jobs.push(this.hop(rook, squareToXZ(m.rookMove.from), squareToXZ(m.rookMove.to), hopDur * 0.55));
     await Promise.all(jobs);
   }
 
   private hopDuration(from: Square, to: Square): number {
-    return 0.36 + Math.min(0.22, this.dist(from, to) * 0.035);
-  }
-
-  private dist(from: Square, to: Square): number {
     const a = squareToFR(from);
     const b = squareToFR(to);
-    return Math.hypot(a.f - b.f, a.r - b.r);
+    return hopSeconds(Math.hypot(a.f - b.f, a.r - b.r));
   }
 
-  private async hop(p: PieceObj, from: Square, to: Square, delay: number): Promise<void> {
+  /** Paper hop between two board points (world x/z). `speed` > 1 makes it quicker. */
+  async hop(p: PieceObj, a: XZ, b: XZ, delay: number, speed = 1): Promise<void> {
     const gen = this.gen;
-    const a = squareToXZ(from);
-    const b = squareToXZ(to);
-    const d = this.dist(from, to);
+    const d = Math.hypot(b.x - a.x, b.z - a.z);
     const h = 0.35 + Math.min(1.4, d * 0.22);
-    const dur = this.hopDuration(from, to);
+    const dur = hopSeconds(d) / speed;
     // Tilt toward travel direction (in pivot space roughly along screen-x is fine).
     const dirX = b.x - a.x;
     await this.tw.add(
@@ -266,9 +291,9 @@ export class PieceLayer {
       { delay, ease: ease.inOutCubic },
     );
     if (gen !== this.gen) return;
-    p.placeAt(to);
+    p.root.position.set(b.x, BOARD_Y, b.z);
     // Landing squash.
-    await this.tw.add(0.16, (t) => {
+    await this.tw.add(0.16 / speed, (t) => {
       const s = Math.sin(Math.PI * t);
       p.body.scale.set(1 + s * 0.12, 1 - s * 0.16, 1 + s * 0.12);
       p.pivot.rotation.z *= 1 - t;
@@ -303,7 +328,7 @@ export class PieceLayer {
       { delay, ease: ease.outCubic },
     );
     if (gen !== this.gen) return;
-    const burst = this.burst(p.root.position.clone());
+    const puff = burst(this.fx, this.tw, p.root.position.clone().setY(BOARD_Y));
     await this.tw.add(
       dur - squash,
       (t) => {
@@ -318,51 +343,10 @@ export class PieceLayer {
     this.group.remove(p.root);
     this.all.delete(p);
     p.dispose();
-    await burst;
+    await puff;
   }
+}
 
-  /** A handful of puffs + paper confetti flying out. */
-  private async burst(at: THREE.Vector3): Promise<void> {
-    const parts: { m: THREE.Mesh; v: THREE.Vector3; s: number; spin: number }[] = [];
-    const puffMat = new THREE.MeshStandardMaterial({ color: '#f3ead9', roughness: 1, transparent: true, emissive: '#806850', emissiveIntensity: 0.4 });
-    const bitMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, transparent: true, side: THREE.DoubleSide });
-    const bitGeo = new THREE.PlaneGeometry(0.09, 0.07);
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2 * 3 + Math.random() * 0.4;
-      const puff = i < 8;
-      const m = new THREE.Mesh(puff ? puffGeo : bitGeo, puff ? puffMat : bitMat);
-      m.position.set(at.x, BOARD_Y + 0.25 + Math.random() * 0.5, at.z);
-      const sp = puff ? 1.4 + Math.random() * 0.8 : 1.8 + Math.random();
-      parts.push({
-        m,
-        v: new THREE.Vector3(Math.cos(a) * sp, (puff ? 0.8 : 2.2) + Math.random(), Math.sin(a) * sp),
-        s: puff ? 0.7 + Math.random() * 0.6 : 1,
-        spin: (Math.random() - 0.5) * 20,
-      });
-      this.fx.add(m);
-    }
-    const dur = 0.65;
-    let last = 0;
-    await this.tw.add(dur, (t) => {
-      const dt = (t - last) * dur;
-      last = t;
-      for (const p of parts) {
-        p.m.position.addScaledVector(p.v, dt);
-        if (p.m.geometry === bitGeo) {
-          p.v.y -= 6 * dt;
-          p.m.rotation.x += p.spin * dt;
-          p.m.rotation.z += p.spin * 0.7 * dt;
-        } else {
-          p.v.multiplyScalar(1 - 3 * dt);
-          p.m.scale.setScalar(p.s * (0.8 + t * 1.8));
-        }
-      }
-      puffMat.opacity = 1 - t * t;
-      bitMat.opacity = 1 - t;
-    });
-    for (const p of parts) this.fx.remove(p.m);
-    puffMat.dispose();
-    bitMat.dispose();
-    bitGeo.dispose();
-  }
+function hopSeconds(dist: number): number {
+  return 0.36 + Math.min(0.22, dist * 0.035);
 }

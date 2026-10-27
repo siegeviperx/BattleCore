@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import type { BoardPiece, Color, MoveAnim, MoveTarget, Square } from '../core/types';
+import type { BoardPiece, Color, FightMode, MoveAnim, MoveTarget, Square } from '../core/types';
+import { FightDirector } from '../fight/director';
 import type { BoardView } from './types';
 import { createScene } from './scene';
 import { createBoard } from './board';
@@ -27,6 +28,8 @@ class ThreeBoardView implements BoardView {
   private ndc = new THREE.Vector2();
   private boardPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BOARD_Y);
   private down: { x: number; y: number; id: number } | null = null;
+  private fights: FightDirector;
+  private vignette: HTMLDivElement;
   private start = performance.now();
 
   constructor(private container: HTMLElement) {
@@ -51,6 +54,22 @@ class ThreeBoardView implements BoardView {
     scene.add(this.highlights.group, this.pieces.group);
 
     this.rig = new CameraRig(r.domElement, this.camTw);
+
+    // Darkened edges that focus the eye on a fight.
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
+    this.vignette = document.createElement('div');
+    Object.assign(this.vignette.style, {
+      position: 'absolute',
+      inset: '0',
+      pointerEvents: 'none',
+      opacity: '0',
+      background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 38%, rgba(12,6,4,0.78) 100%)',
+    });
+    container.appendChild(this.vignette);
+    this.fights = new FightDirector(scene, this.pieces, this.rig, this.pieceTw, {
+      setDim: (a) => (this.vignette.style.opacity = String(a)),
+    });
+    this.pieces.setFightHandler((m, mover, victim) => this.fights.play(m, mover, victim));
 
     this.resize();
     new ResizeObserver(() => this.resize()).observe(container);
@@ -125,6 +144,7 @@ class ThreeBoardView implements BoardView {
   // ---- BoardView ----------------------------------------------------------
 
   setPosition(pieces: BoardPiece[]): void {
+    this.fights.abort();
     this.pieces.setPosition(pieces);
   }
 
@@ -142,6 +162,11 @@ class ThreeBoardView implements BoardView {
 
   setCheck(square: Square | null): void {
     this.highlights.setCheck(square);
+  }
+
+  setFightMode(mode: FightMode): void {
+    this.fights.mode = mode;
+    this.pieces.setFightHandler(mode === 'off' ? null : (m, mover, victim) => this.fights.play(m, mover, victim));
   }
 
   setViewSide(color: Color, animate: boolean): void {

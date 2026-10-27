@@ -7,6 +7,9 @@ export type Square = string;
 
 export type Level = 'easy' | 'medium' | 'hard' | 'max';
 
+/** Capture fight scenes: full cinematic, a sped-up version, or the plain board poof. */
+export type FightMode = 'full' | 'quick' | 'off';
+
 export interface BoardPiece {
   square: Square;
   color: Color;

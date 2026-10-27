@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BattleCore fight preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1210; }
+      #app { position: fixed; inset: 0; }
+      #ctl { position: fixed; left: 8px; top: 8px; color: #fff; font: 13px sans-serif; background: rgba(0,0,0,.6); padding: 8px 10px; border-radius: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 36px); }
+      #ctl select, #ctl button { font: inherit; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="ctl">
+      <label>Attacker <select id="a"></select></label>
+      <label>Defender <select id="d"></select></label>
+      <label>Mode <select id="mode"><option>full</option><option>quick</option><option>off</option></select></label>
+      <button id="go">Fight!</button>
+      <button id="all">Play all attackers</button>
+      <span id="status"></span>
+    </div>
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>

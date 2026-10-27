@@ -1,4 +1,4 @@
-import type { BoardPiece, Color, MoveAnim, MoveTarget, Square } from '../core/types';
+import type { BoardPiece, Color, FightMode, MoveAnim, MoveTarget, Square } from '../core/types';
 
 export interface BoardView {
   /** Replace all pieces instantly (new game, undo). */
@@ -10,6 +10,8 @@ export interface BoardView {
   setLastMove(from: Square | null, to: Square | null): void;
   /** Square of a king in check, or null. */
   setCheck(square: Square | null): void;
+  /** How captures are shown from now on. */
+  setFightMode(mode: FightMode): void;
   /** Rotate the camera to view from this side. */
   setViewSide(color: Color, animate: boolean): void;
   /** Fired when the user clicks/taps a board square or a piece standing on it. */

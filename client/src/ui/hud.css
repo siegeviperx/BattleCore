@@ -1214,6 +1214,10 @@
   grid-template-columns: 1fr 1fr;
 }
 
+.bc-seg--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .bc-sides--3 {
   grid-template-columns: repeat(3, 1fr);
 }
