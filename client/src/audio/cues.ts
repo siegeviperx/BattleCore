@@ -126,11 +126,11 @@ export interface SoundFile {
 
 /** Kenney CC0 sounds (kenney.nl), by base name; `n` numbered takes, e.g. kenney('click_00', 1, 5). */
 const kenney = (base: string, from: number, to: number, o: Omit<SoundFile, 'files'> = {}): SoundFile => ({
-  files: Array.from({ length: to - from + 1 }, (_, i) => `assets/audio/kenney/${base}${from + i}.ogg`),
+  files: Array.from({ length: to - from + 1 }, (_, i) => `assets/audio/kenney/${base}${from + i}.mp3`),
   ...o,
 });
 const kenneyNamed = (names: string[], o: Omit<SoundFile, 'files'> = {}): SoundFile => ({
-  files: names.map((n) => `assets/audio/kenney/${n}.ogg`),
+  files: names.map((n) => `assets/audio/kenney/${n}.mp3`),
   ...o,
 });
 
