@@ -166,11 +166,20 @@ The opponent's move is never delayed by the other player's fight animation.
 
 ## 8. Computer Opponent
 
-- **Stockfish (WASM build)** runs in a Web Worker so the UI never freezes.
-- Difficulty set with Stockfish skill level + search depth/time:
-  Easy (skill 1, ~0.1 s) · Medium (skill 8) · Hard (skill 15) · Max (skill 20).
-- ⚠️ **License:** Stockfish is GPLv3. Fine for a free/open-source game. If BattleCore is sold as
-  closed source, swap in a permissively licensed engine. Decide before release.
+**Decision:** we write our own engine (no Stockfish). We own all of it, so there's no license
+problem on any platform, and it can have per-faction personality.
+
+- **Search:** iterative-deepening alpha-beta (negamax) with quiescence search, move ordering
+  (captures ordered by MVV-LVA, killer moves), and a transposition table.
+- **Evaluation:** material + piece-square tables, with a tapered middlegame/endgame king table.
+- **Runs in a Web Worker** so the UI never freezes; each move has a time limit.
+- **Difficulty:** each level sets a search depth/time cap plus deliberate mistakes (random
+  sub-optimal picks) for lower levels.
+  Easy · Medium · Hard · Max. Target: Max ≈ 1600–2000 Elo, which beats most casual players.
+- **Personality (later):** evaluation tweaks per faction. Dinos favor attacking and trading;
+  Babies favor king safety and sneaky pawn play.
+- **Pluggable:** the AI sits behind an `Engine` interface (`findMove(fen, options)`), so a stronger
+  engine could be swapped in later if needed.
 
 ---
 
@@ -183,15 +192,20 @@ The opponent's move is never delayed by the other player's fight animation.
 | 3D rendering | Three.js |
 | Animation | Three.js AnimationMixer (GLB clips) + a tweening library for camera and UI |
 | Chess rules | chess.js |
-| AI | Stockfish WASM (Web Worker) |
+| AI | Custom alpha-beta engine (TypeScript, Web Worker) |
 | Networking | Node.js + `ws` (or Colyseus if rooms grow complex) |
 | Assets | Meshy (image → 3D, rigging, animation) + Blender (cleanup, materials, sprite renders) |
 | Testing | Vitest (rules/state), Playwright (smoke tests) |
 
-**Why a browser game rather than Godot or Unity:** online play and sharing are just a link, with
-nothing to install. It's also fast to change and test, and it uses the GLB models that Meshy
-produces directly. Godot is free with no royalties and is the fallback if we later want a native
-desktop or console build.
+**Decision: browser first.** Online play and sharing are just a link, with nothing to install. It's
+also fast to change and test, and it uses the GLB models that Meshy produces directly.
+
+**Keeping a Unity port possible:** art (GLB models, animations, sprites, audio), the server, and
+the protocol carry over to Unity unchanged; the client code would have to be rewritten in C#. To keep
+that rewrite small:
+- Cutscene timelines, fight choreography, piece definitions, and tuning live in **plain data
+  files (JSON)**, not hard-coded.
+- Game logic (`core`, `ai`) never imports rendering code, so its structure translates directly.
 
 ### Repo layout (planned)
 ```
@@ -201,7 +215,7 @@ desktop or console build.
     /render     scene, board, pieces, camera
     /cutscene   intro timeline runner
     /fight      fight-scene director
-    /ai         Stockfish worker bridge
+    /ai         custom chess engine + Web Worker
     /net        online client
     /ui         menus, HUD
   /public/assets  models (.glb), sprites, audio
@@ -260,7 +274,7 @@ that already works.
 ## 13. Open Questions
 
 - Final title / logo treatment ("BattleCore"?).
-- Monetization (free / paid / open source) → decides the Stockfish license question.
+- Monetization (free / paid / open source). No engine-license constraint now that the AI is custom.
 - Voice: babble-only, or occasional baby-talk lines ("Fow da Babies!")?
 - Mobile support priority (touch controls and performance budget).
 - Should the faction pick (play as Babies or Dinos) be separate from color (white/black)?
