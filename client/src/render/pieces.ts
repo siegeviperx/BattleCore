@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { BoardPiece, Color, MoveAnim, PieceType, Square } from '../core/types';
 import data from '../data/pieces.json';
 import { BOARD_Y, squareToFR, squareToXZ } from './coords';
-import { CUTOUT_ASPECT, cutoutHit, getBaseTopTexture, getCutout } from './cutouts';
+import { CUTOUT_ASPECT, cutoutHit, getBaseTopTexture, getCutout, hasArt } from './cutouts';
 import { ease, Tweener } from './tween';
 
 const BASE_H = 0.16;
@@ -10,6 +10,8 @@ const BASE_R_TOP = 0.35;
 const BASE_R_BOTTOM = 0.38;
 
 const HEIGHTS: Record<PieceType, number> = { p: 0.95, n: 1.08, b: 1.08, r: 1.08, q: 1.22, k: 1.3 };
+/** Die-cut character art has no card background, so it needs to be larger to read at the same size. */
+const ART_SCALE = 1.25;
 
 const baseGeo = new THREE.CylinderGeometry(BASE_R_TOP, BASE_R_BOTTOM, BASE_H, 40);
 baseGeo.translate(0, BASE_H / 2, 0);
@@ -84,7 +86,7 @@ export class PieceObj {
   }
 
   private applySize(): void {
-    const h = HEIGHTS[this.type];
+    const h = HEIGHTS[this.type] * (hasArt(this.color, this.type) ? ART_SCALE : 1);
     this.cutout.scale.set(h * CUTOUT_ASPECT, h, 1);
   }
 

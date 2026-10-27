@@ -19,7 +19,7 @@
   },
   "pieces": {
     "w": {
-      "p": { "name": "Baby Rifleman", "icon": "👶" },
+      "p": { "name": "Baby Rifleman", "icon": "👶", "art": "pieces/w-p.png" },
       "n": { "name": "Jetpack Baby", "icon": "🚀" },
       "b": { "name": "Sniper Baby", "icon": "🎯" },
       "r": { "name": "Baby Watchtower", "icon": "🏰" },
@@ -27,7 +27,7 @@
       "k": { "name": "Baby Commander", "icon": "🤴" }
     },
     "b": {
-      "p": { "name": "Raptor Trooper", "icon": "🦎" },
+      "p": { "name": "Raptor Trooper", "icon": "🦎", "art": "pieces/b-p.png" },
       "n": { "name": "Ptero Gunship", "icon": "🦅" },
       "b": { "name": "Trike Tank", "icon": "🦏" },
       "r": { "name": "Dino Fortress", "icon": "🏯" },

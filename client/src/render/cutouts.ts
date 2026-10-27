@@ -35,6 +35,10 @@ export function getCutout(color: Color, type: PieceType): Cutout {
   return c;
 }
 
+export function hasArt(color: Color, type: PieceType): boolean {
+  return Boolean((data.pieces[color][type] as { art?: string }).art);
+}
+
 /** True if the sticker is opaque at texture uv (three.js uv, v up). */
 export function cutoutHit(c: Cutout, u: number, v: number): boolean {
   const x = Math.min(c.maskW - 1, Math.max(0, Math.floor(u * c.maskW)));
@@ -158,35 +162,66 @@ function drawCutout(color: Color, type: PieceType): Cutout {
   ctx.fillText(label, W / 2, bannerY + bannerH / 2 + 1);
   ctx.restore();
 
-  // Chess glyph corner badge.
-  const cx = ix + 26;
-  const cy = iy + 26;
+  drawGlyphBadge(ctx, color, glyph, ix + 26, iy + 26, 1);
+
+  const texture = new THREE.CanvasTexture(cv);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  const cutout: Cutout = { texture, ...buildMask(ctx, cv) };
+
+  // Real sticker art replaces the placeholder once it has loaded.
+  const art = (piece as { art?: string }).art;
+  if (art) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, W, H);
+      ctx.drawImage(img, 0, 0, W, H);
+      drawGlyphBadge(ctx, color, glyph, 30, 30, 0.8);
+      texture.needsUpdate = true;
+      Object.assign(cutout, buildMask(ctx, cv));
+    };
+    img.src = `${import.meta.env.BASE_URL}assets/${art}`;
+  }
+  return cutout;
+}
+
+/** Chess glyph corner badge, so chess players always recognise the role. */
+function drawGlyphBadge(
+  ctx: CanvasRenderingContext2D,
+  color: Color,
+  glyph: string,
+  cx: number,
+  cy: number,
+  scale: number,
+) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowBlur = 4;
   ctx.shadowOffsetY = 2;
   ctx.fillStyle = color === 'w' ? '#fffaf0' : '#1d1d20';
   ctx.beginPath();
-  ctx.arc(cx, cy, 24, 0, Math.PI * 2);
+  ctx.arc(0, 0, 24, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   ctx.lineWidth = 3;
   ctx.strokeStyle = color === 'w' ? '#2b2a1a' : '#ffffff';
   ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+  ctx.arc(0, 0, 22, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fillStyle = color === 'w' ? '#2b2a1a' : '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   // U+FE0E forces text presentation so the glyph isn't swapped for an emoji.
   ctx.font = `32px ${GLYPH_FONT}`;
-  ctx.fillText(glyph + '︎', cx, cy + 2);
+  ctx.fillText(glyph + '︎', 0, 2);
+  ctx.restore();
+}
 
-  const texture = new THREE.CanvasTexture(cv);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-
-  // Alpha mask for pixel-accurate picking.
+/** Downsampled alpha mask for pixel-accurate picking. */
+function buildMask(ctx: CanvasRenderingContext2D, cv: HTMLCanvasElement): Omit<Cutout, 'texture'> {
   const img = ctx.getImageData(0, 0, cv.width, cv.height).data;
   const step = MASK_STEP * SCALE;
   const maskW = Math.floor(cv.width / step);
@@ -197,7 +232,7 @@ function drawCutout(color: Color, type: PieceType): Cutout {
       mask[y * maskW + x] = img[((y * step + step / 2) * cv.width + x * step + step / 2) * 4 + 3];
     }
   }
-  return { texture, mask, maskW, maskH };
+  return { mask, maskW, maskH };
 }
 
 /** Top-cap texture for a faction base: base colour + white emblem. */
