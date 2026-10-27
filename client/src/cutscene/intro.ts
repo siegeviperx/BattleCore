@@ -2,11 +2,11 @@
 // Dino sheds its shirt and the babies spill out, both armies square off, then everything flattens into the paper
 // cutouts. Characters are static models moved by code; transformations are swaps hidden behind puffs.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { audio, sfx, type CueName } from '../audio';
 import type { BoardPiece, PieceType } from '../core/types';
 import { createFighter, type Fighter } from '../fight/fighters';
 import { preloadFighterModels } from '../fight/models';
+import { gltfLoader } from '../render/gltf';
 import { blast, burst } from '../fight/fx';
 import type { CameraRig, Shot } from '../render/camera';
 import { BOARD_Y, squareToXZ } from '../render/coords';
@@ -33,7 +33,7 @@ let loading: Promise<void> | null = null;
 /** Start downloading the intro characters; resolves once each one has loaded or failed. */
 export function preloadIntro(): Promise<void> {
   if (loading) return loading;
-  const loader = new GLTFLoader();
+  const loader = gltfLoader();
   loading = Promise.all(
     CHARACTERS.map((key) =>
       loader
@@ -43,6 +43,11 @@ export function preloadIntro(): Promise<void> {
     ),
   ).then(() => {});
   return loading;
+}
+
+/** Every intro character that has loaded so far (for warming up the GPU). */
+export function loadedIntroScenes(): THREE.Object3D[] {
+  return [...charCache.values()];
 }
 
 /** A character `height` tall, feet at the origin, facing local +Z. */

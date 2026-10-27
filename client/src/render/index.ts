@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { BoardPiece, Color, FightMode, MoveAnim, MoveTarget, Square } from '../core/types';
-import { IntroDirector } from '../cutscene/intro';
+import { IntroDirector, loadedIntroScenes } from '../cutscene/intro';
 import { FightDirector } from '../fight/director';
+import { loadedFighterScenes } from '../fight/models';
 import type { BoardView } from './types';
 import { createScene } from './scene';
 import { createBoard } from './board';
@@ -18,6 +19,12 @@ export type { Insets } from './camera';
 const CLICK_SLOP = 6;
 /** Touch: holding a piece this long (ms) shows its name tag instead of tapping it. */
 const HOLD_MS = 450;
+/** Phones and tablets: a lighter pixel ratio and shadow map keep fights smooth. */
+const TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const MAX_PIXEL_RATIO = TOUCH ? 1.5 : 2;
+/** Adaptive resolution: if frames average slower than this (ms) the pixel ratio steps down, never below 1. */
+const SLOW_FRAME_MS = 24;
+const PIXEL_RATIO_STEP = 0.25;
 
 class ThreeBoardView implements BoardView {
   private renderer: THREE.WebGLRenderer;
@@ -42,15 +49,21 @@ class ThreeBoardView implements BoardView {
   private introPlaying = false;
   private vignette: HTMLDivElement;
   private start = performance.now();
+  private pixelCap = MAX_PIXEL_RATIO;
+  /** Frame timing for adaptive resolution: frames counted and their summed ms since the last check. */
+  private perf = { last: 0, n: 0, sum: 0 };
+  /** One-per-frame GPU uploads queued by warmUp, so the first fight doesn't stall on them. */
+  private uploads: (() => void)[] = [];
+  private warmed: Promise<void>;
 
   constructor(private container: HTMLElement) {
     const r = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
+    r.setPixelRatio(Math.min(this.pixelCap, window.devicePixelRatio || 1));
     r.domElement.style.display = 'block';
     r.domElement.style.width = '100%';
     r.domElement.style.height = '100%';
@@ -58,7 +71,8 @@ class ThreeBoardView implements BoardView {
     this.renderer = r;
     container.appendChild(r.domElement);
 
-    const { scene } = createScene();
+    const { scene, sun } = createScene();
+    if (TOUCH) sun.shadow.mapSize.set(1024, 1024);
     this.scene = scene;
     scene.add(createBoard());
     this.pieces = new PieceLayer(this.pieceTw);
@@ -82,6 +96,7 @@ class ThreeBoardView implements BoardView {
     });
     this.pieces.setFightHandler((m, mover, victim) => this.fights.play(m, mover, victim));
     this.intro = new IntroDirector(scene, this.pieces, this.rig, this.pieceTw);
+    this.warmed = this.intro.ready().then(() => this.warmUp());
 
     this.resize();
     new ResizeObserver(() => this.resize()).observe(container);
@@ -96,13 +111,16 @@ class ThreeBoardView implements BoardView {
   private resize(): void {
     const w = Math.max(1, this.container.clientWidth);
     const h = Math.max(1, this.container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.renderer.setPixelRatio(Math.min(this.pixelCap, window.devicePixelRatio || 1));
     this.renderer.setSize(w, h, false);
     this.rig.setViewport(w, h);
   }
 
   private frame(): void {
-    const t = (performance.now() - this.start) / 1000;
+    const now = performance.now();
+    const t = (now - this.start) / 1000;
+    this.uploads.shift()?.();
+    this.trackFrameTime(now);
     this.camTw.update(t);
     this.pieceTw.update(t);
     this.fights.update(t);
@@ -115,6 +133,47 @@ class ThreeBoardView implements BoardView {
     this.pieces.update(t, this.rig.camera);
     this.highlights.update(t);
     this.renderer.render(this.scene, this.rig.camera);
+  }
+
+  /**
+   * Upload every loaded model's textures and compile its shaders ahead of time; otherwise the first fight with
+   * each piece hitches while the GPU catches up. Spread one model per frame.
+   */
+  private warmUp(): Promise<void> {
+    const models = [...loadedFighterScenes(), ...loadedIntroScenes()];
+    return new Promise((resolve) => {
+      for (const m of models) {
+        this.uploads.push(() => {
+          m.traverse((o) => {
+            if (!(o instanceof THREE.Mesh)) return;
+            for (const mat of [o.material].flat()) {
+              for (const v of Object.values(mat)) if (v instanceof THREE.Texture) this.renderer.initTexture(v);
+            }
+          });
+          void this.renderer.compileAsync(m, this.rig.camera, this.scene).catch(() => {});
+        });
+      }
+      this.uploads.push(resolve);
+    });
+  }
+
+  /** Every two seconds, drop the pixel ratio a step if the frame rate is struggling. */
+  private trackFrameTime(now: number): void {
+    const p = this.perf;
+    const dt = now - p.last;
+    p.last = now;
+    // Skip the loading rush, intro model swaps and tab switches; they aren't steady-state frame times.
+    if (dt > 250 || now - this.start < 6000) return;
+    p.n++;
+    p.sum += dt;
+    if (p.sum < 2000) return;
+    const avg = p.sum / p.n;
+    p.n = p.sum = 0;
+    const current = this.renderer.getPixelRatio();
+    if (avg > SLOW_FRAME_MS && current > 1) {
+      this.pixelCap = Math.max(1, current - PIXEL_RATIO_STEP);
+      this.resize();
+    }
   }
 
   // ---- input -------------------------------------------------------------
@@ -292,7 +351,7 @@ class ThreeBoardView implements BoardView {
   }
 
   introReady(): Promise<void> {
-    return this.intro.ready();
+    return this.warmed;
   }
 
   async playIntro(pieces: BoardPiece[]): Promise<void> {

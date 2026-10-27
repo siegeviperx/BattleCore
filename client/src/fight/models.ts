@@ -1,9 +1,9 @@
 // Meshy fighter models (public/assets/fighters/<color>-<type>.glb). Loaded in the background; until a model
 // arrives (or if it is missing) createFighter falls back to the procedural toy, so a fight never waits on a download.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { lookCount, lookKey } from '../core/looks';
+import { gltfLoader } from '../render/gltf';
 import type { Color, PieceType } from '../core/types';
 import tuning from '../data/fighter-models.json';
 
@@ -36,7 +36,7 @@ let loading: Promise<void> | null = null;
 /** Start downloading every fighter model; resolves once each one has loaded or failed. */
 export function preloadFighterModels(): Promise<void> {
   if (loading) return loading;
-  const loader = new GLTFLoader();
+  const loader = gltfLoader();
   const jobs: Promise<void>[] = [];
   for (const c of ['w', 'b'] as Color[]) {
     for (const t of TYPES) {
@@ -53,6 +53,11 @@ export function preloadFighterModels(): Promise<void> {
   }
   loading = Promise.all(jobs).then(() => {});
   return loading;
+}
+
+/** Every fighter model that has loaded so far (for warming up the GPU before the first fight). */
+export function loadedFighterScenes(): THREE.Object3D[] {
+  return [...cache.values()].map((g) => g.scene);
 }
 
 /** Tuning is keyed like "wp" / "wp2" (the look key without its dash). */

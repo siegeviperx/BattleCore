@@ -13,7 +13,12 @@ interface Settings {
   mode: SoundMode;
   /** Quick toggle from the HUD speaker button; overrides the mode without forgetting it. */
   muted: boolean;
+  /** Player volume sliders, 0..1, on top of the mix levels below. */
+  musicVol: number;
+  sfxVol: number;
 }
+
+export type VolumeKind = 'music' | 'sfx';
 
 const STORAGE_KEY = 'battlecore.audio.v1';
 const SFX_LEVEL = 0.9;
@@ -89,6 +94,17 @@ class AudioEngine {
 
   setMuted(muted: boolean): void {
     this.settings.muted = muted;
+    this.changed();
+  }
+
+  volume(kind: VolumeKind): number {
+    return kind === 'music' ? this.settings.musicVol : this.settings.sfxVol;
+  }
+
+  setVolume(kind: VolumeKind, v: number): void {
+    const vol = Math.min(1, Math.max(0, v));
+    if (kind === 'music') this.settings.musicVol = vol;
+    else this.settings.sfxVol = vol;
     this.changed();
   }
 
@@ -208,8 +224,10 @@ class AudioEngine {
     const { mode, muted } = this.settings;
     const t = this.ctx.currentTime;
     this.master.gain.setTargetAtTime(muted ? 0 : 1, t, 0.03);
-    this.sfxBus.gain.setTargetAtTime(mode === 'off' ? 0 : SFX_LEVEL, t, 0.03);
-    this.musicBus.gain.setTargetAtTime(mode === 'all' ? MUSIC_LEVEL : 0, t, 0.03);
+    // Squared so the slider feels even to the ear (gain is not loudness).
+    const { musicVol, sfxVol } = this.settings;
+    this.sfxBus.gain.setTargetAtTime(mode === 'off' ? 0 : SFX_LEVEL * sfxVol ** 2, t, 0.03);
+    this.musicBus.gain.setTargetAtTime(mode === 'all' ? MUSIC_LEVEL * musicVol ** 2 : 0, t, 0.03);
   }
 
   private scheduleMusic(): void {
@@ -320,12 +338,15 @@ function whiteNoise(ctx: AudioContext): AudioBuffer {
 function loadSettings(): Settings {
   try {
     const p = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Settings>;
+    const vol = (v: unknown): number => (typeof v === 'number' && v >= 0 && v <= 1 ? v : 1);
     return {
       mode: p.mode === 'sfx' || p.mode === 'off' ? p.mode : 'all',
       muted: p.muted === true,
+      musicVol: vol(p.musicVol),
+      sfxVol: vol(p.sfxVol),
     };
   } catch {
-    return { mode: 'all', muted: false };
+    return { mode: 'all', muted: false, musicVol: 1, sfxVol: 1 };
   }
 }
 

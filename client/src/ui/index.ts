@@ -1,6 +1,6 @@
 import './hud.css';
 import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
-import { audio, type SoundMode } from '../audio';
+import { audio, sfx, type SoundMode, type VolumeKind } from '../audio';
 import data from '../data/pieces.json';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
 import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
@@ -43,6 +43,15 @@ const SOUND_MODES: { id: SoundMode; label: string; hint: string }[] = [
   { id: 'all', label: 'On', hint: 'Music + effects' },
   { id: 'sfx', label: 'Effects', hint: 'No music' },
   { id: 'off', label: 'Off', hint: 'Silence' },
+];
+/** Who made what; shown from the menu's Credits button. Links open in a new tab. */
+const CREDITS: { role: string; name: string; url?: string; note?: string }[] = [
+  { role: 'Created by', name: 'siegeviperx' },
+  { role: '3D models & art', name: 'Meshy AI', url: 'https://www.meshy.ai' },
+  { role: 'Voices, music & sound effects', name: 'ElevenLabs', url: 'https://elevenlabs.io' },
+  { role: 'More sound effects', name: 'Kenney', url: 'https://kenney.nl', note: 'Interface Sounds & Impact Sounds (CC0)' },
+  { role: '3D engine', name: 'three.js', url: 'https://threejs.org' },
+  { role: 'Built with', name: 'Claude Code', url: 'https://claude.com/claude-code' },
 ];
 const ROLE_NAMES: Record<PieceType, string> = { p: 'Pawn', n: 'Knight', b: 'Bishop', r: 'Rook', q: 'Queen', k: 'King' };
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
@@ -471,6 +480,45 @@ export function createHud(root: HTMLElement): Hud {
     });
   }
 
+  function showCredits(): void {
+    const list = el(
+      'dl',
+      'bc-credits',
+      undefined,
+      ...CREDITS.flatMap((c) => [
+        el('dt', undefined, undefined, c.role),
+        el(
+          'dd',
+          undefined,
+          undefined,
+          c.url ? el('a', undefined, { href: c.url, target: '_blank', rel: 'noopener' }, c.name) : c.name,
+          ...(c.note ? [el('small', undefined, undefined, c.note)] : []),
+        ),
+      ]),
+    );
+    const finish = (): void => {
+      document.removeEventListener('keydown', onKey, true);
+      close();
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        finish();
+      }
+    };
+    const node = el(
+      'div',
+      'bc-dialog',
+      undefined,
+      el('h2', 'bc-dialog__title', undefined, 'Credits'),
+      list,
+      el('div', 'bc-dialog__actions', undefined, button('bc-btn bc-btn--primary', 'Back', finish, { 'data-autofocus': true })),
+    );
+    document.addEventListener('keydown', onKey, true);
+    const close = openModal(node, 'Credits');
+  }
+
   /** Shows a modal dialog; returns a function that closes it and restores focus. */
   function openModal(node: HTMLElement, label: string, opts: { instant?: boolean } = {}): () => void {
     const prevFocus = document.activeElement as HTMLElement | null;
@@ -617,13 +665,26 @@ export function createHud(root: HTMLElement): Hud {
           { 'aria-pressed': 'false', 'data-sound': m.id },
         ),
       );
+      const volumeSlider = (kind: VolumeKind, label: string): HTMLLabelElement => {
+        const input = el('input', 'bc-volume__input', { type: 'range', min: '0', max: '100', step: '5', 'aria-label': `${label} volume` });
+        input.value = String(Math.round(audio.volume(kind) * 100));
+        const out = el('span', 'bc-volume__value', undefined, `${input.value}%`);
+        input.addEventListener('input', () => {
+          audio.setVolume(kind, Number(input.value) / 100);
+          out.textContent = `${input.value}%`;
+        });
+        if (kind === 'sfx') input.addEventListener('change', () => sfx('pop')); // a sample at the new level
+        return el('label', 'bc-volume', undefined, el('span', 'bc-volume__label', undefined, label), input, out);
+      };
       const soundOptions = el(
         'div',
         'bc-field bc-field--sound',
         undefined,
         el('div', 'bc-field__label', undefined, 'Sound'),
         el('div', 'bc-seg bc-seg--3', { role: 'group', 'aria-label': 'Sound' }, ...soundBtns),
+        el('div', 'bc-volumes', undefined, volumeSlider('music', 'Music'), volumeSlider('sfx', 'Effects')),
       );
+      const creditsBtn = button('bc-credits-link', 'Credits', showCredits);
 
       const rotateInput = el('input', 'bc-switch__input', { type: 'checkbox', role: 'switch' });
       rotateInput.addEventListener('change', () => {
@@ -803,6 +864,7 @@ export function createHud(root: HTMLElement): Hud {
         introOptions,
         soundOptions,
         deployBtn,
+        creditsBtn,
       );
 
       const menu = el(

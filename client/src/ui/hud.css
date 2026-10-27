@@ -1908,3 +1908,109 @@
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 0 4px rgba(243, 154, 60, 0.45);
   }
 }
+
+/* ---- Volume sliders (menu, under Sound) ---- */
+.bc-volumes {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bc-volume {
+  display: grid;
+  grid-template-columns: 64px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--bc-steel-edge);
+  pointer-events: auto;
+}
+
+.bc-volume__label {
+  color: var(--bc-ink-dim);
+  font-size: 14px;
+}
+
+.bc-volume__value {
+  color: var(--bc-ink-mute);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bc-volume__input {
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  accent-color: var(--bc-sunset);
+  cursor: pointer;
+}
+
+.bc-volume__input:focus-visible {
+  outline: 2px solid var(--bc-focus);
+  outline-offset: 2px;
+}
+
+/* ---- Credits ---- */
+.bc-credits-link {
+  align-self: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  color: var(--bc-ink-mute);
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.bc-credits-link:hover { color: var(--bc-ink); }
+
+.bc-credits-link:focus-visible {
+  outline: 2px solid var(--bc-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.bc-credits {
+  margin: 8px 0 20px;
+  text-align: center;
+}
+
+.bc-credits dt {
+  margin-top: 12px;
+  font-family: var(--bc-font-head);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bc-sunset);
+}
+
+.bc-credits dd {
+  margin: 2px 0 0;
+  color: var(--bc-ink);
+  font-size: 16px;
+}
+
+.bc-credits a {
+  color: var(--bc-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--bc-steel-edge);
+  text-underline-offset: 3px;
+}
+
+.bc-credits a:hover { text-decoration-color: var(--bc-sunset); }
+
+.bc-credits small {
+  display: block;
+  color: var(--bc-ink-mute);
+  font-size: 12px;
+}
