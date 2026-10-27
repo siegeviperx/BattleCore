@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Color } from '../core/types';
+import { BOARD_Y } from './coords';
 import { ease, Tweener } from './tween';
 
 const FOV = 42;
@@ -9,6 +10,14 @@ const DEFAULT_POLAR = Math.atan2(8.5, 9);
 const BASE_DIST = Math.hypot(8.5, 9);
 /** Half-width (world units) that must fit horizontally. */
 const HALF_WIDTH = 5.0;
+/** Scripted shots (intro, fights) are framed for a 16:9 screen. Narrower screens widen the lens up to
+ *  MAX_SHOT_FOV and pull the camera back for the rest, so each shot keeps its width on a phone. */
+const SHOT_ASPECT = 16 / 9;
+const MAX_SHOT_FOV = 70;
+/** A pulled-back shot camera never sinks below this (it would look up through the table). */
+const MIN_SHOT_Y = BOARD_Y + 0.25;
+const toRad = THREE.MathUtils.degToRad;
+const toDeg = THREE.MathUtils.radToDeg;
 
 /** Screen edges (CSS px) covered by HUD panels; the board is framed in the space between them. */
 export interface Insets {
@@ -35,6 +44,7 @@ export class CameraRig {
   /** Camera shake amplitude (world units) during a shot. */
   shakeAmp = 0;
   private size = { w: 1, h: 1 };
+  private shotPos = new THREE.Vector3();
   private insets: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
 
   constructor(dom: HTMLElement, private tw: Tweener) {
@@ -138,6 +148,21 @@ export class CameraRig {
       });
   }
 
+  /** Lens and pull-back that give a shot on this screen the width it has on a 16:9 screen. */
+  private narrowFit(): { fov: number; dolly: number } {
+    const aspect = this.camera.aspect;
+    if (aspect >= SHOT_ASPECT) return { fov: FOV, dolly: 1 };
+    const want = Math.tan(toRad(FOV / 2)) * SHOT_ASPECT; // tan of the horizontal half-angle a 16:9 shot shows
+    const fov = Math.min(MAX_SHOT_FOV, 2 * toDeg(Math.atan(want / aspect)));
+    return { fov, dolly: want / (Math.tan(toRad(fov / 2)) * aspect) };
+  }
+
+  private setFov(fov: number): void {
+    if (Math.abs(this.camera.fov - fov) < 1e-3) return;
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
+  }
+
   /** Take the camera off the orbit controls for a scripted shot, starting from the current view. */
   beginShot(): Shot {
     this.endShot();
@@ -154,6 +179,7 @@ export class CameraRig {
     if (!s) return;
     this.shot = null;
     this.shakeAmp = 0;
+    this.setFov(FOV);
     this.camera.position.copy(s.home.pos);
     this.controls.target.copy(s.home.target);
     this.camera.lookAt(s.home.target);
@@ -163,12 +189,14 @@ export class CameraRig {
   update(): void {
     const s = this.shot;
     if (s) {
+      // Ease the narrow-screen adjustment in as the shot leaves the board view, so cutting away and back never jumps.
+      const fit = this.narrowFit();
+      const away = Math.min(1, s.pos.distanceTo(s.home.pos) / 2);
+      this.setFov(FOV + (fit.fov - FOV) * away);
+      const p = this.shotPos.copy(s.pos).sub(s.target).multiplyScalar(1 + (fit.dolly - 1) * away).add(s.target);
+      p.y = Math.max(p.y, Math.min(s.pos.y, MIN_SHOT_Y));
       const k = this.shakeAmp;
-      this.camera.position.set(
-        s.pos.x + (Math.random() - 0.5) * k,
-        s.pos.y + (Math.random() - 0.5) * k,
-        s.pos.z + (Math.random() - 0.5) * k,
-      );
+      this.camera.position.set(p.x + (Math.random() - 0.5) * k, p.y + (Math.random() - 0.5) * k, p.z + (Math.random() - 0.5) * k);
       this.camera.lookAt(s.target);
       return;
     }
