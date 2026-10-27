@@ -1,3 +1,4 @@
+import type { Insets } from './camera';
 import type { BoardPiece, Color, FightMode, MoveAnim, MoveTarget, Square } from '../core/types';
 
 export interface BoardView {
@@ -10,6 +11,12 @@ export interface BoardView {
   setLastMove(from: Square | null, to: Square | null): void;
   /** Square of a king in check, or null. */
   setCheck(square: Square | null): void;
+  /** One-shot check effect on the king's square (the steady glow is setCheck). */
+  showCheck(square: Square): void;
+  /** The mated king topples and the winning side cheers. Resolves when it's over. */
+  playCheckmate(king: Square, winner: Color): Promise<void>;
+  /** Screen edges covered by the HUD; the board is framed in the rest. */
+  setInsets(insets: Insets): void;
   /** How captures are shown from now on. */
   setFightMode(mode: FightMode): void;
   /** Rotate the camera to view from this side. */

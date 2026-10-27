@@ -168,6 +168,12 @@ export const FILES: Partial<Record<CueName, SoundFile>> = {
   squish: ai(['squish'], { vol: 0.8 }),
   whee: ai(['whee'], { vol: 0.6 }),
   flame: ai(['flame'], { vol: 0.8, maxDur: 0.9 }),
+  victory: ai(['sting-victory'], { vol: 0.8 }),
+  defeat: ai(['sting-defeat'], { vol: 0.8 }),
+  draw: ai(['sting-draw'], { vol: 0.8 }),
+  mate: ai(['sting-checkmate']),
+  'sting.cute': ai(['sting-cute'], { vol: 0.6 }),
+  'sting.standoff': ai(['sting-standoff']),
 
   // Kenney CC0
   click: kenney('click_00', 1, 5, { vol: 0.6 }),

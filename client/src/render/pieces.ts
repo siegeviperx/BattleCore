@@ -216,6 +216,70 @@ export class PieceLayer {
     }
   }
 
+  /** Check: the king shivers, hops and flashes red. */
+  async alarm(sq: Square): Promise<void> {
+    const p = this.bySquare.get(sq);
+    if (!p || p.moving) return;
+    const gen = this.gen;
+    const mat = p.cutout.material;
+    p.moving = true;
+    await this.tw.add(0.8, (t) => {
+      if (gen !== this.gen) return;
+      const k = 1 - t;
+      p.pivot.rotation.z = Math.sin(t * 42) * 0.14 * k;
+      p.body.position.y = Math.abs(Math.sin(t * Math.PI * 2)) * 0.14 * k;
+      const red = Math.sin(t * Math.PI * 3) ** 2 * k;
+      mat.emissive.setRGB(1, 1 - red * 0.85, 1 - red * 0.9);
+    });
+    mat.emissive.set('#ffffff');
+    p.body.position.y = 0;
+    p.moving = false;
+  }
+
+  /** Checkmate: the king trembles red, then topples over on its base edge and stays down, greyed out. */
+  async topple(sq: Square): Promise<void> {
+    const p = this.bySquare.get(sq);
+    if (!p) return;
+    const gen = this.gen;
+    const mat = p.cutout.material;
+    p.moving = true;
+    await this.tw.add(0.6, (t) => {
+      if (gen !== this.gen) return;
+      p.pivot.rotation.z = Math.sin(t * 50) * 0.1;
+      mat.emissive.setRGB(1, 1 - t * 0.85, 1 - t * 0.9);
+    });
+    if (gen !== this.gen) return;
+    p.pivot.rotation.z = 0;
+    const tip = (a: number): void => {
+      p.body.rotation.z = a;
+      p.body.position.set(BASE_R_BOTTOM * Math.cos(a) - BASE_R_BOTTOM, BASE_R_BOTTOM * Math.sin(a), 0);
+    };
+    const down = 1.42;
+    await this.tw.add(0.5, (t) => gen === this.gen && tip(down * t), { ease: ease.inCubic });
+    if (gen !== this.gen) return;
+    sfx('thud', { rate: 0.75 });
+    await this.tw.add(0.3, (t) => gen === this.gen && tip(down - Math.sin(Math.PI * t) * 0.18), { ease: ease.outCubic });
+    mat.emissive.set('#5a4a48');
+  }
+
+  /** The winning side bounces in celebration, in a ripple across the board. */
+  async cheer(color: Color): Promise<void> {
+    const gen = this.gen;
+    const jobs: Promise<void>[] = [];
+    for (const p of this.all) {
+      if (p.color !== color || p.moving) continue;
+      const delay = (squareToFR(p.square).f + Math.random()) * 0.06;
+      jobs.push(
+        this.tw.add(0.9, (t) => {
+          if (gen === this.gen) p.body.position.y = Math.abs(Math.sin(t * Math.PI * 2)) * 0.22 * (1 - t * 0.5);
+        }, { delay }).then(() => {
+          p.body.position.y = 0;
+        }),
+      );
+    }
+    await Promise.all(jobs);
+  }
+
   async animateMove(m: MoveAnim): Promise<void> {
     const mover = this.bySquare.get(m.from);
     if (!mover) return;

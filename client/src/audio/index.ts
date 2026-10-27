@@ -1,7 +1,7 @@
 // Sound effects and music on the Web Audio API. Anything in the game calls `sfx('name')`; the cue recipes live in
 // cues.ts. Browsers keep audio locked until the first tap or key press, so sounds before that are dropped.
 import { CUES, FILES, type CueName, type Layer } from './cues';
-import { LOOP_STEPS, STEP, stepLayers, type Track } from './music';
+import { LOOP_STEPS, MUSIC_FILES, STEP, SYNTH_TRACKS, stepLayers, type Track } from './music';
 
 export type { CueName } from './cues';
 export type { Track } from './music';
@@ -17,7 +17,9 @@ interface Settings {
 
 const STORAGE_KEY = 'battlecore.audio.v1';
 const SFX_LEVEL = 0.9;
-const MUSIC_LEVEL = 0.28;
+const MUSIC_LEVEL = 0.45;
+/** The synth march is louder than the mastered tracks, so it gets less of the music bus. */
+const SYNTH_MUSIC_LEVEL = 0.6;
 /** The same cue retriggered faster than this is skipped (a flock of landings shouldn't stack into a roar). */
 const MIN_REPEAT_S = 0.03;
 const LOOKAHEAD_S = 0.15;
@@ -45,6 +47,9 @@ class AudioEngine {
   useFiles = true;
 
   private track: Track | null = null;
+  /** The streaming element for the current track (null while the synth march or silence plays). */
+  private current: { el: HTMLAudioElement; gain: GainNode } | null = null;
+  private elements = new Map<Track, { el: HTMLAudioElement; gain: GainNode }>();
   private step = 0;
   private nextStepAt = 0;
 
@@ -59,8 +64,13 @@ class AudioEngine {
     for (const e of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(e, unlock, true);
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
-      if (document.hidden) void this.ctx.suspend();
-      else void this.ctx.resume();
+      if (document.hidden) {
+        void this.ctx.suspend();
+        this.current?.el.pause();
+      } else {
+        void this.ctx.resume();
+        if (this.current && !this.current.el.ended) void this.current.el.play().catch(() => {});
+      }
     });
   }
 
@@ -115,12 +125,49 @@ class AudioEngine {
     void this.load(url).then((buf) => buf && this.playBuffer(buf, ctx.currentTime, 1, 1));
   }
 
-  /** Switch the background music (null = silence). Restarts the loop when the track changes. */
-  music(track: Track | null): void {
+  /** Switch the background music (null = silence), fading the old track out over `fade` seconds. */
+  music(track: Track | null, fade = 0.5): void {
     if (track === this.track) return;
     this.track = track;
+    if (this.ctx?.state === 'running') this.startTrack(fade);
+  }
+
+  private startTrack(fade: number): void {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const old = this.current;
+    if (old) {
+      old.gain.gain.cancelScheduledValues(t);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, t);
+      old.gain.gain.linearRampToValueAtTime(0, t + fade);
+      window.setTimeout(() => this.current !== old && old.el.pause(), fade * 1000 + 50);
+    }
+    this.current = null;
     this.step = 0;
-    this.nextStepAt = this.ctx ? this.ctx.currentTime + 0.05 : 0;
+    this.nextStepAt = t + 0.05;
+    if (!this.track || !this.useFiles) return;
+    const next = this.element(this.track);
+    next.el.currentTime = 0;
+    next.gain.gain.cancelScheduledValues(t);
+    next.gain.gain.setValueAtTime(0, t);
+    next.gain.gain.linearRampToValueAtTime(1, t + 0.3);
+    this.current = next;
+    if (!document.hidden) void next.el.play().catch((err) => console.warn('Music failed to play:', err));
+  }
+
+  private element(track: Track): { el: HTMLAudioElement; gain: GainNode } {
+    let e = this.elements.get(track);
+    if (!e) {
+      const { file, loop } = MUSIC_FILES[track];
+      const el = new Audio(`${import.meta.env.BASE_URL}${file}`);
+      el.loop = loop;
+      el.preload = 'auto';
+      const gain = this.ctx!.createGain();
+      this.ctx!.createMediaElementSource(el).connect(gain).connect(this.musicBus);
+      e = { el, gain };
+      this.elements.set(track, e);
+    }
+    return e;
   }
 
   private unlock(): void {
@@ -145,7 +192,7 @@ class AudioEngine {
     }
     if (this.ctx.state === 'suspended' && !document.hidden) {
       void this.ctx.resume().then(() => {
-        if (this.ctx) this.nextStepAt = this.ctx.currentTime + 0.05;
+        if (this.ctx && !this.current) this.startTrack(0);
       });
     }
   }
@@ -167,12 +214,12 @@ class AudioEngine {
 
   private scheduleMusic(): void {
     const ctx = this.ctx;
-    if (!ctx || ctx.state !== 'running' || !this.track) return;
+    if (!ctx || ctx.state !== 'running' || !this.track || this.current || !SYNTH_TRACKS.has(this.track)) return;
     // Silent music keeps its place in the loop without scheduling notes.
     const audible = this.settings.mode === 'all' && !this.settings.muted;
     if (this.nextStepAt < ctx.currentTime) this.nextStepAt = ctx.currentTime + 0.02;
     while (this.nextStepAt < ctx.currentTime + LOOKAHEAD_S) {
-      if (audible) this.playLayers(stepLayers(this.track, this.step), this.nextStepAt, this.musicBus, 1, 1);
+      if (audible) this.playLayers(stepLayers(this.track, this.step), this.nextStepAt, this.musicBus, 1, SYNTH_MUSIC_LEVEL);
       this.nextStepAt += STEP;
       this.step = (this.step + 1) % LOOP_STEPS;
     }

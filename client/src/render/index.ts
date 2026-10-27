@@ -7,11 +7,12 @@ import { createScene } from './scene';
 import { createBoard } from './board';
 import { PieceLayer } from './pieces';
 import { Highlights } from './highlights';
-import { CameraRig } from './camera';
-import { Tweener } from './tween';
-import { BOARD_Y, xzToSquare } from './coords';
+import { CameraRig, type Insets } from './camera';
+import { BOARD_Y, squareToXZ, xzToSquare } from './coords';
+import { ease, Tweener } from './tween';
 
 export type { BoardView } from './types';
+export type { Insets } from './camera';
 
 /** Pointer travel (px) above which a press counts as an orbit drag, not a click. */
 const CLICK_SLOP = 6;
@@ -90,7 +91,7 @@ class ThreeBoardView implements BoardView {
     const h = Math.max(1, this.container.clientHeight);
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.setSize(w, h, false);
-    this.rig.setAspect(w / h);
+    this.rig.setViewport(w, h);
   }
 
   private frame(): void {
@@ -170,6 +171,62 @@ class ThreeBoardView implements BoardView {
     this.highlights.setCheck(square);
   }
 
+  showCheck(square: Square): void {
+    void this.pieces.alarm(square);
+    this.ringBurst(square, '#ff3a1a', 2.2, 0.6);
+    this.shake(0.05, 0.3);
+  }
+
+  async playCheckmate(king: Square, winner: Color): Promise<void> {
+    this.ringBurst(king, '#ff3a1a', 2.6, 0.6);
+    const fall = this.pieces.topple(king);
+    await new Promise((r) => setTimeout(r, 1100)); // as the king hits the board
+    this.flash('#fff1c4');
+    this.ringBurst(king, '#ffd36a', 6, 0.9);
+    this.shake(0.14, 0.5);
+    await fall;
+    await this.pieces.cheer(winner);
+  }
+
+  /** A shockwave ring expanding from a square. */
+  private ringBurst(square: Square, color: string, size: number, seconds: number): void {
+    const { x, z } = squareToXZ(square);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 64).rotateX(-Math.PI / 2), mat);
+    ring.position.set(x, BOARD_Y + 0.01, z);
+    ring.renderOrder = 5;
+    this.scene.add(ring);
+    void this.pieceTw.add(seconds, (t) => {
+      ring.scale.setScalar(0.6 + t * size);
+      mat.opacity = 1 - t;
+    }, { ease: ease.outCubic }).then(() => {
+      this.scene.remove(ring);
+      ring.geometry.dispose();
+      mat.dispose();
+    });
+  }
+
+  /** Shake the whole table (the camera rig only shakes inside fight shots). */
+  private shake(amp: number, seconds: number): void {
+    const s = this.scene.position;
+    void this.camTw.add(seconds, (t) => {
+      const k = amp * (1 - t);
+      s.set((Math.random() - 0.5) * k, (Math.random() - 0.5) * k * 0.5, (Math.random() - 0.5) * k);
+    }).then(() => s.set(0, 0, 0));
+  }
+
+  /** A quick full-screen flash of light. */
+  private flash(color: string): void {
+    const el = document.createElement('div');
+    Object.assign(el.style, { position: 'absolute', inset: '0', pointerEvents: 'none', background: color, opacity: '0' });
+    this.container.appendChild(el);
+    el.animate([{ opacity: 0.65 }, { opacity: 0 }], { duration: 650, easing: 'ease-out' }).onfinish = () => el.remove();
+  }
+
+  setInsets(insets: Insets): void {
+    this.rig.setInsets(insets);
+  }
+
   setFightMode(mode: FightMode): void {
     this.fights.mode = mode;
     this.pieces.setFightHandler(mode === 'off' ? null : (m, mover, victim) => this.fights.play(m, mover, victim));
@@ -205,6 +262,7 @@ class ThreeBoardView implements BoardView {
     let stop: () => void = () => {};
     const skip = new Promise<void>((resolve) => {
       const onInput = (e: Event): void => {
+        if ((e as KeyboardEvent).repeat) return; // a key still held from the start card
         e.preventDefault();
         resolve();
       };

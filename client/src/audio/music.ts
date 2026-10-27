@@ -1,8 +1,22 @@
-// Placeholder music: a toy-box march (snare, kick, glockenspiel, bass) sequenced from synth layers.
-// 'menu' is the full tune; 'battle' drops the melody so it sits under the game.
+// Music tracks. Each streams from a file (ElevenLabs, art-source/audio/ai); the synth march below is the fallback
+// for menu and battle when recordings are switched off on the dev sound board.
 import type { Layer } from './cues';
 
-export type Track = 'menu' | 'battle';
+export type Track = 'menu' | 'battle' | 'intro' | 'victory' | 'defeat';
+
+/** Streamed music files under client/public; `loop` tracks repeat, the rest play once. */
+export const MUSIC_FILES: Record<Track, { file: string; loop: boolean }> = {
+  menu: { file: 'assets/audio/music/menu.mp3', loop: true },
+  battle: { file: 'assets/audio/music/battle.mp3', loop: true },
+  intro: { file: 'assets/audio/music/intro.mp3', loop: false },
+  victory: { file: 'assets/audio/music/victory.mp3', loop: false },
+  defeat: { file: 'assets/audio/music/defeat.mp3', loop: false },
+};
+
+/** Tracks the synth march can stand in for. */
+export const SYNTH_TRACKS: ReadonlySet<Track> = new Set(['menu', 'battle']);
+
+// --- Synth fallback: a toy-box march (snare, kick, glockenspiel, bass). 'battle' drops the melody. ---
 
 const BPM = 112;
 /** One sixteenth note, in seconds. */

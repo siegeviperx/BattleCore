@@ -115,8 +115,12 @@ recBox.addEventListener('change', () => (audio.useFiles = recBox.checked));
 recLabel.append(recBox, ' Use recordings (green = has a recording; untick to hear the synth version)');
 board.append(recLabel);
 const music = row('Music');
-addBtn(music, 'Menu march', () => audio.music('menu'));
-addBtn(music, 'Battle loop', () => audio.music('battle'));
+for (const [label, track] of [['Menu', 'menu'], ['Battle', 'battle'], ['Intro', 'intro'], ['Victory', 'victory'], ['Defeat', 'defeat']] as const) {
+  addBtn(music, label, () => {
+    audio.music(null, 0); // restart even if it's already playing (e.g. after flipping "Use recordings")
+    audio.music(track);
+  });
+}
 addBtn(music, 'Stop', () => audio.music(null));
 let cueRow: HTMLElement = music;
 for (const name of Object.keys(CUES) as CueName[]) {

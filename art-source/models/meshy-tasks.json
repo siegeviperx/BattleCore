@@ -77,13 +77,16 @@
     "w-k": "01a17e22-f6f3-7497-9fe2-29a77cf03c4f"
   },
   "intro_images": {
-    "giant-baby": "01a17e2b-4baf-77eb-9caf-b500bc7c67b6",
+    "giant-baby": "01a17eaa-6f30-77fa-9590-7db1bf599bbb",
     "baby-dino": "01a17e2b-5358-7398-934b-d7d44840ab7e",
     "baby-dino-noshirt": "01a17e2c-12f7-73a2-91d6-e085ca5ceadc"
   },
   "intro_models": {
-    "giant-baby": "01a17e33-7214-7452-8ebe-2152bfc1dd26",
+    "giant-baby": "01a17eab-2a38-71e7-8fe5-b3e25af41b6d",
     "baby-dino": "01a17e33-757e-77d9-b36a-5699f93feb54",
     "baby-dino-noshirt": "01a17e33-7815-733b-be65-2a8d56192d1d"
+  },
+  "notes": {
+    "giant-baby": "2026-10-27: diaper replaced with khaki cargo shorts after a parent complaint (39 credits). Diaper version: image 01a17e2b-4baf-77eb-9caf-b500bc7c67b6, model 01a17e33-7214-7452-8ebe-2152bfc1dd26."
   }
 }

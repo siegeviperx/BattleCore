@@ -22,6 +22,14 @@ export type BannerKind = 'check' | 'mate' | 'draw' | 'info';
 /** When the intro cinematic plays on launch. */
 export type IntroMode = 'always' | 'first' | 'never';
 
+/** Screen edges (CSS px) covered by HUD panels. */
+export interface ScreenInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export type OpponentStatus = 'waiting' | 'connected' | 'disconnected' | 'left';
 
 export interface Lobby {
@@ -49,6 +57,10 @@ export interface Hud {
   onMenu(cb: () => void): void;
   /** Hide the HUD for a cutscene. */
   setCinematic(on: boolean): void;
+  /** Fires when the screen area covered by the HUD changes (resize, panel layout, HUD hidden for a cutscene). */
+  onInsetsChange(cb: (insets: ScreenInsets) => void): void;
+  /** Title card that waits for a tap or key press, which also lets the browser start audio. */
+  showStart(): Promise<void>;
   /** The saved intro preference (read before the menu opens). */
   introMode(): IntroMode;
 

@@ -13,7 +13,11 @@ hudEl.addEventListener('click', (e) => {
   if ((e.target as Element).closest('button:not(:disabled)')) sfx('click');
 });
 
-const controller = new Controller(createBoardView(boardEl), createHud(hudEl), createEngine());
+const board = createBoardView(boardEl);
+const hud = createHud(hudEl);
+hud.onInsetsChange((insets) => board.setInsets(insets));
+
+const controller = new Controller(board, hud, createEngine());
 void controller.start();
 
 // Dev-only handle for automated browser tests and console poking.

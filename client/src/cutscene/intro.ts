@@ -3,7 +3,7 @@
 // cutouts. Characters are static models moved by code; transformations are swaps hidden behind puffs.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { sfx, type CueName } from '../audio';
+import { audio, sfx, type CueName } from '../audio';
 import type { BoardPiece, PieceType } from '../core/types';
 import { createFighter, type Fighter } from '../fight/fighters';
 import { blast, burst } from '../fight/fx';
@@ -339,6 +339,7 @@ export class IntroDirector {
     // 8. Gets serious: everyone snaps round to face the dinos and squares up.
     cut(v(0.5, 0.75, 1.1), v(0.5, 0.45, 2.5));
     sfx('scratch');
+    audio.music(null, 0.08);
     await tween(0.35, (t) => {
       for (const { f, home, yaw } of babyFigs) {
         f.root.rotation.y += (yaw - f.root.rotation.y) * t;

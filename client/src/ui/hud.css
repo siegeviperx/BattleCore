@@ -145,6 +145,20 @@
   text-overflow: ellipsis;
 }
 
+.bc-turn__short {
+  display: none;
+}
+
+/* Small phones: "Dinos to move" instead of "Armored Dinos to move". */
+@media (max-width: 420px) {
+  .bc-turn__long {
+    display: none;
+  }
+  .bc-turn__short {
+    display: inline;
+  }
+}
+
 .bc-turn__icon {
   display: grid;
   place-items: center;
@@ -1740,6 +1754,54 @@
 /* Reduced motion                                                      */
 /* ------------------------------------------------------------------ */
 
+/* Tap-to-start title card (before the intro; the tap also unlocks audio) */
+.bc-start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: max(24px, env(safe-area-inset-top)) 16px 28px;
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: center;
+  background:
+    radial-gradient(90% 60% at 50% 110%, rgba(243, 120, 40, 0.45), transparent 70%),
+    radial-gradient(120% 90% at 50% 50%, rgba(10, 8, 6, 0.55), rgba(10, 8, 6, 0.95)),
+    #120c08;
+  animation: bc-fade-in 350ms ease both;
+}
+
+.bc-start:focus {
+  outline: none;
+}
+
+.bc-start.is-leaving {
+  animation: bc-menu-out 350ms ease both;
+}
+
+.bc-start__prompt {
+  margin: 24px 0 0;
+  padding: 10px 22px;
+  border: 2px solid var(--bc-gold);
+  border-radius: 999px;
+  color: var(--bc-gold);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: bc-start-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes bc-start-pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.97);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bc-root *,
   .bc-root *::before,
@@ -1753,7 +1815,10 @@
   .bc-options,
   .bc-dialog,
   .bc-modal-backdrop,
-  .bc-menu.is-leaving {
+  .bc-menu.is-leaving,
+  .bc-start,
+  .bc-start.is-leaving,
+  .bc-start__prompt {
     animation: none !important;
   }
 

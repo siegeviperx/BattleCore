@@ -10,6 +10,14 @@ const BASE_DIST = Math.hypot(8.5, 9);
 /** Half-width (world units) that must fit horizontally. */
 const HALF_WIDTH = 5.0;
 
+/** Screen edges (CSS px) covered by HUD panels; the board is framed in the space between them. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 /** A scripted camera shot (fight scenes). Mutate `pos`/`target`; the rig applies them every frame. */
 export interface Shot {
   pos: THREE.Vector3;
@@ -26,6 +34,8 @@ export class CameraRig {
   private shot: Shot | null = null;
   /** Camera shake amplitude (world units) during a shot. */
   shakeAmp = 0;
+  private size = { w: 1, h: 1 };
+  private insets: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
 
   constructor(dom: HTMLElement, private tw: Tweener) {
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
@@ -46,16 +56,33 @@ export class CameraRig {
     return side === 'w' ? 0 : Math.PI;
   }
 
-  /** Distance that fits the board for the current aspect. */
+  /** Distance that fits the board's width into the area the HUD leaves free. */
   fitDistance(): number {
-    const aspect = this.camera.aspect;
+    const { w, h } = this.size;
+    const freeW = Math.max(1, w - this.insets.left - this.insets.right);
     const vHalf = THREE.MathUtils.degToRad(FOV / 2);
-    const hHalf = Math.atan(Math.tan(vHalf) * aspect);
+    const hHalf = Math.atan((Math.tan(vHalf) * freeW) / h);
     return Math.max(BASE_DIST, HALF_WIDTH / Math.tan(hHalf) + 2.5);
   }
 
-  setAspect(aspect: number): void {
-    this.camera.aspect = aspect;
+  setViewport(w: number, h: number): void {
+    this.size = { w, h };
+    this.applyView();
+  }
+
+  setInsets(insets: Insets): void {
+    const a = this.insets;
+    if (a.top === insets.top && a.right === insets.right && a.bottom === insets.bottom && a.left === insets.left) return;
+    this.insets = { ...insets };
+    this.applyView();
+  }
+
+  private applyView(): void {
+    const { w, h } = this.size;
+    const i = this.insets;
+    this.camera.aspect = w / h;
+    // Shift the projection so the orbit target sits in the middle of the free area, not the middle of the screen.
+    this.camera.setViewOffset(w, h, (i.right - i.left) / 2, (i.bottom - i.top) / 2, w, h);
     this.camera.updateProjectionMatrix();
     const fit = this.fitDistance();
     this.controls.minDistance = Math.min(7, fit * 0.6);

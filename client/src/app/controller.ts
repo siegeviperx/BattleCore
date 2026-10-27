@@ -65,10 +65,13 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    // The intro cinematic opens the app (per the menu's intro setting, or always with ?intro=1), before the menu.
+    // The intro cinematic opens the app (per the menu's intro setting, or ?intro=1 / ?intro=0), before the menu.
     if (shouldPlayIntro(this.hud.introMode())) {
+      // Browsers only start audio after a tap or key press, so the intro waits behind a title card.
+      await this.hud.showStart();
       this.setView('w', false);
       this.hud.setCinematic(true);
+      audio.music('intro');
       await this.board.playIntro(this.game.pieces());
       this.hud.setCinematic(false);
       markIntroSeen();
@@ -172,9 +175,11 @@ export class Controller {
       return;
     }
     if (outcome.over) return;
-    if (this.game.checkSquare()) {
+    const checked = this.game.checkSquare();
+    if (checked) {
       this.hud.showBanner('CHECK!', 'check');
       sfx('check');
+      this.board.showCheck(checked);
     }
     if (this.choice.mode === 'local' && this.choice.autoRotate) this.setView(this.game.turn, true);
     void this.maybeAiMove();
@@ -243,16 +248,21 @@ export class Controller {
       subtitle = RESULT_TEXT[result.reason];
     } else {
       this.hud.showBanner(result.reason === 'checkmate' ? 'CHECKMATE!' : 'VICTORY!', 'mate');
-      if (result.reason === 'checkmate') sfx('mate');
       const me = this.humanSide();
       title = me !== null && result.winner !== me ? 'Defeat!' : 'Victory!';
-      sfx(title === 'Defeat!' ? 'defeat' : 'victory', { delay: result.reason === 'checkmate' ? 1.1 : 0 });
+      const king = result.reason === 'checkmate' ? this.game.checkSquare() : null;
+      if (king) {
+        sfx('mate');
+        await this.board.playCheckmate(king, result.winner);
+      }
+      sfx(title === 'Defeat!' ? 'defeat' : 'victory');
       subtitle =
         result.reason === 'abandon'
           ? `${factionName(result.winner)} wins. ${RESULT_TEXT.abandon}`
           : `${factionName(result.winner)} wins ${RESULT_TEXT[result.reason]}`;
     }
     await new Promise((r) => setTimeout(r, 1200));
+    if (result.winner !== 'draw') audio.music(title === 'Defeat!' ? 'defeat' : 'victory');
     const session = this.online;
     const next = await this.hud.showGameOver(title, subtitle);
     if (session !== this.online) return;
@@ -429,7 +439,8 @@ export class Controller {
 const INTRO_SEEN_KEY = 'battlecore.intro.seen';
 
 function shouldPlayIntro(mode: IntroMode): boolean {
-  if (new URLSearchParams(location.search).has('intro')) return true;
+  const forced = new URLSearchParams(location.search).get('intro'); // ?intro=1 forces it, ?intro=0 skips it
+  if (forced !== null) return forced !== '0';
   if (mode !== 'first') return mode === 'always';
   try {
     return localStorage.getItem(INTRO_SEEN_KEY) === null;

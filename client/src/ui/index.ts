@@ -3,9 +3,9 @@ import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import { audio, type SoundMode } from '../audio';
 import data from '../data/pieces.json';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
-import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
+import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, ScreenInsets } from './types';
 
-export type { Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus } from './types';
+export type { Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus, ScreenInsets } from './types';
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -414,6 +414,35 @@ export function createHud(root: HTMLElement): Hud {
   function setHudHidden(hidden: boolean): void {
     hudLayer.classList.toggle('is-hidden', hidden);
     hudLayer.toggleAttribute('inert', hidden);
+    queueInsets();
+  }
+
+  // ----- Board insets: the board is framed in the space the top bar and panel leave free -----
+  const insetCbs: ((i: ScreenInsets) => void)[] = [];
+  let insets: ScreenInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  let insetFrame = 0;
+
+  function measureInsets(): ScreenInsets {
+    if (hudLayer.classList.contains('is-hidden')) return { top: 0, right: 0, bottom: 0, left: 0 };
+    const r = root.getBoundingClientRect();
+    const top = Math.round(topBar.getBoundingClientRect().bottom - r.top + 6);
+    const p = panel.getBoundingClientRect();
+    if (p.width >= r.width - 2) {
+      // Phone: the panel is a bottom strip. While the log is pulled open it overlays the board instead of reframing it.
+      const bottom = panel.classList.contains('is-open') ? insets.bottom : Math.round(r.bottom - p.top);
+      return { top, right: 0, bottom, left: 0 };
+    }
+    return { top, right: Math.round(r.right - p.left + 8), bottom: 0, left: 0 };
+  }
+
+  function queueInsets(): void {
+    cancelAnimationFrame(insetFrame);
+    insetFrame = requestAnimationFrame(() => {
+      const next = measureInsets();
+      if (next.top === insets.top && next.right === insets.right && next.bottom === insets.bottom && next.left === insets.left) return;
+      insets = next;
+      for (const cb of insetCbs) cb(insets);
+    });
   }
 
   /** Shows a modal dialog; returns a function that closes it and restores focus. */
@@ -829,7 +858,11 @@ export function createHud(root: HTMLElement): Hud {
     turnPill.style.setProperty('--facl', LABEL[color]);
     turnPill.dataset.color = color;
     turnText.textContent = '';
-    turnText.append(el('span', 'bc-turn__icon', { 'aria-hidden': 'true' }, PIECES[color].k.icon), `${f.name} to move`);
+    turnText.append(
+      el('span', 'bc-turn__icon', { 'aria-hidden': 'true' }, PIECES[color].k.icon),
+      el('span', 'bc-turn__long', undefined, `${f.name} to move`),
+      el('span', 'bc-turn__short', undefined, `${f.short} to move`),
+    );
   }
 
   function setMoves(san: string[]): void {
@@ -1150,6 +1183,31 @@ export function createHud(root: HTMLElement): Hud {
     });
   }
 
+  function showStart(): Promise<void> {
+    return new Promise((resolve) => {
+      const card = el(
+        'div',
+        'bc-start',
+        { role: 'button', tabindex: '0', 'aria-label': 'Start BattleCore' },
+        el('h1', 'bc-title', undefined, 'BattleCore'),
+        el('p', 'bc-subtitle', undefined, el('span', 'bc-subtitle__w', undefined, FACTIONS.w.name), ' vs ', el('span', 'bc-subtitle__b', undefined, FACTIONS.b.name)),
+        el('p', 'bc-start__prompt', undefined, 'Tap or press any key to start'),
+      );
+      const go = (e: Event): void => {
+        e.preventDefault();
+        window.removeEventListener('pointerdown', go, true);
+        window.removeEventListener('keydown', go, true);
+        card.classList.add('is-leaving');
+        window.setTimeout(() => card.remove(), 350);
+        resolve();
+      };
+      window.addEventListener('pointerdown', go, true);
+      window.addEventListener('keydown', go, true);
+      modalLayer.append(card);
+      card.focus({ preventScroll: true });
+    });
+  }
+
   function showMessage(title: string, text: string): Promise<void> {
     return new Promise((resolve) => {
       let done = false;
@@ -1181,6 +1239,11 @@ export function createHud(root: HTMLElement): Hud {
     });
   }
 
+  const insetWatch = new ResizeObserver(queueInsets);
+  insetWatch.observe(root);
+  insetWatch.observe(panel);
+  insetWatch.observe(topBar);
+
   // Initial state
   setTurn('w');
   setMoves([]);
@@ -1200,6 +1263,12 @@ export function createHud(root: HTMLElement): Hud {
     onFlip: (cb) => void flipCbs.push(cb),
     onMenu: (cb) => void menuCbs.push(cb),
     setCinematic,
+    showStart,
+    onInsetsChange: (cb) => {
+      insetCbs.push(cb);
+      cb(insets);
+      queueInsets();
+    },
     introMode: () => loadSaved().intro,
     showLobby,
     setOnlineMode,
