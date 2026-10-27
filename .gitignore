@@ -9,3 +9,6 @@ Thumbs.db
 
 # Raw Meshy downloads (~500 MB); re-download with the task IDs in art-source/models/meshy-tasks.json
 art-source/models/raw/
+
+# Kenney CC0 source packs (re-download from kenney.nl); picked sounds are copied into client/public/assets/audio
+art-source/audio/packs/

@@ -3,6 +3,7 @@ import type { BoardPiece, Color, MoveAnim, PieceType, Square } from '../core/typ
 import data from '../data/pieces.json';
 import { BOARD_Y, squareToFR, squareToXZ } from './coords';
 import { CUTOUT_ASPECT, cutoutHit, getBaseTopTexture, getCutout, hasArt } from './cutouts';
+import { sfx } from '../audio';
 import { burst } from '../fight/fx';
 import { ease, Tweener } from './tween';
 
@@ -281,10 +282,15 @@ export class PieceLayer {
     const dur = hopSeconds(d) / speed;
     // Tilt toward travel direction (in pivot space roughly along screen-x is fine).
     const dirX = b.x - a.x;
+    let lifted = false;
     await this.tw.add(
       dur,
       (t) => {
         p.moving = true;
+        if (!lifted && gen === this.gen) {
+          lifted = true;
+          sfx('flutter');
+        }
         p.root.position.set(a.x + (b.x - a.x) * t, BOARD_Y + Math.sin(Math.PI * t) * h, a.z + (b.z - a.z) * t);
         // stretch in the air, lean slightly
         const air = Math.sin(Math.PI * t);
@@ -296,6 +302,7 @@ export class PieceLayer {
     );
     if (gen !== this.gen) return;
     p.root.position.set(b.x, BOARD_Y, b.z);
+    sfx('land');
     // Landing squash.
     await this.tw.add(0.16 / speed, (t) => {
       const s = Math.sin(Math.PI * t);
@@ -309,6 +316,7 @@ export class PieceLayer {
   private async pop(p: PieceObj): Promise<void> {
     const gen = this.gen;
     p.moving = true;
+    sfx('promote');
     await this.tw.add(0.32, (t) => {
       const s = 1 + Math.sin(Math.PI * t) * 0.35;
       p.body.scale.setScalar(s);

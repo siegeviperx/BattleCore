@@ -1,6 +1,7 @@
 // Fight-scene director: turns a capture into zoom in → pop to 3D → attack → knockout → poof → flatten → zoom out.
 // The framing, camera and timing are shared by every fight; only the attack and knockout clips change per piece.
 import * as THREE from 'three';
+import { sfx } from '../audio';
 import type { FightMode, MoveAnim } from '../core/types';
 import choreo from '../data/fights.json';
 import type { CameraRig } from '../render/camera';
@@ -162,6 +163,7 @@ export class FightDirector {
     const at = defender.body.getWorldPosition(new THREE.Vector3());
     at.y = Math.max(BOARD_Y, at.y - 0.2);
     const puff = burst(stage, tw, at, 1.2);
+    sfx(mover.color === 'w' ? 'giggle' : 'roar', { vol: 0.7, delay: T(0.15) });
     stage.remove(defender.root);
     this.layer.discard(victim);
     await tw.wait(T(0.3));
@@ -233,6 +235,7 @@ export class FightDirector {
     const flat = this.tw.add(T(timing.popIn * 0.5), (t) => (piece.pivot.scale.x = Math.max(0.001, 1 - t)), { ease: ease.inCubic });
     await flat;
     piece.pivot.visible = false;
+    sfx('pop');
     void blast(this.stage!, this.tw, f.root.position.clone().setY(BOARD_Y + 0.4), 0.5, '#ffffff');
     await this.tw.add(T(timing.popIn), (t) => f.root.scale.setScalar(Math.max(0.001, t)), { ease: ease.outBack });
   }
@@ -241,6 +244,7 @@ export class FightDirector {
     if (!alive()) return;
     const d = c.defender;
     d.setFlash(heavy ? 1 : 0.6);
+    sfx(heavy ? 'hit.heavy' : 'hit.light');
     if (heavy) d.play('hit', this.speed);
     if (heavy) {
       c.shake(timing.shake, T(0.25));

@@ -9,6 +9,16 @@
       #app { position: fixed; inset: 0; }
       #ctl { position: fixed; left: 8px; top: 8px; color: #fff; font: 13px sans-serif; background: rgba(0,0,0,.6); padding: 8px 10px; border-radius: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 36px); }
       #ctl select, #ctl button { font: inherit; }
+      #sfx { position: fixed; left: 8px; bottom: 8px; color: #fff; font: 12px sans-serif; background: rgba(0,0,0,.6); padding: 8px 10px; border-radius: 8px; max-width: calc(100vw - 36px); max-height: 45vh; overflow: auto; }
+      #sfx h4 { margin: 6px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }
+      #sfx div { display: flex; flex-wrap: wrap; gap: 4px; }
+      #sfx button { font: inherit; }
+      #sfx button.rec { background: #d9f2c4; }
+      #packs { position: fixed; right: 8px; top: 8px; bottom: 8px; width: 260px; display: flex; flex-direction: column; gap: 6px; color: #fff; font: 12px sans-serif; background: rgba(0,0,0,.6); padding: 8px 10px; border-radius: 8px; }
+      #packs input { font: inherit; }
+      #packs ul { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+      #packs li button { width: 100%; text-align: left; font: inherit; margin-bottom: 2px; }
+      #packs small { opacity: .7; }
     </style>
   </head>
   <body>
@@ -21,6 +31,8 @@
       <button id="all">Play all attackers</button>
       <span id="status"></span>
     </div>
+    <div id="sfx"></div>
+    <div id="packs"></div>
     <script type="module" src="./preview.ts"></script>
   </body>
 </html>

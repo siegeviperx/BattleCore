@@ -1,5 +1,6 @@
 import './hud.css';
 import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
+import { audio, type SoundMode } from '../audio';
 import data from '../data/pieces.json';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
 import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
@@ -37,6 +38,11 @@ const INTRO_MODES: { id: IntroMode; label: string; hint: string }[] = [
   { id: 'always', label: 'Always', hint: 'Every launch' },
   { id: 'first', label: 'First time', hint: 'Just once' },
   { id: 'never', label: 'Never', hint: 'Straight in' },
+];
+const SOUND_MODES: { id: SoundMode; label: string; hint: string }[] = [
+  { id: 'all', label: 'On', hint: 'Music + effects' },
+  { id: 'sfx', label: 'Effects', hint: 'No music' },
+  { id: 'off', label: 'Off', hint: 'Silence' },
 ];
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
 const PROMO_KEYS: Record<string, PieceType> = { q: 'q', r: 'r', b: 'b', n: 'n' };
@@ -89,7 +95,7 @@ function button(cls: string, label: string | Node[], onClick?: () => void, attrs
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const ICON_PATHS: Record<'undo' | 'flip' | 'menu' | 'chev' | 'flag' | 'handshake' | 'copy' | 'link', string> = {
+const ICON_PATHS: Record<'undo' | 'flip' | 'menu' | 'chev' | 'flag' | 'handshake' | 'copy' | 'link' | 'sound' | 'mute', string> = {
   undo: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
   flip: 'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3',
   menu: 'M4 6h16M4 12h16M4 18h16',
@@ -98,6 +104,8 @@ const ICON_PATHS: Record<'undo' | 'flip' | 'menu' | 'chev' | 'flag' | 'handshake
   handshake:
     'M11 17l2 2a1 1 0 1 0 3-3M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4M21 3l1 11h-2M3 3 2 14l6.47 6.47a1 1 0 1 0 3-3M3 4h8',
   copy: 'M8 8h12v12H8zM16 8V4H4v12h4',
+  sound: 'M11 5 6 9H2v6h4l5 4zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14',
+  mute: 'M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6',
   link: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
 };
 
@@ -251,6 +259,18 @@ export function createHud(root: HTMLElement): Hud {
   );
   const topBar = el('div', 'bc-top', undefined, turnPill, oppChip);
 
+  // ----- Speaker (quick mute) -----
+  const muteBtn = button('bc-mute', [], () => audio.setMuted(!audio.muted));
+  const syncMute = (): void => {
+    const label = audio.muted ? 'Unmute sound' : 'Mute sound';
+    muteBtn.replaceChildren(icon(audio.muted ? 'mute' : 'sound'));
+    muteBtn.title = label;
+    muteBtn.setAttribute('aria-label', label);
+    muteBtn.setAttribute('aria-pressed', String(audio.muted));
+  };
+  syncMute();
+  audio.onChange(syncMute);
+
   // ----- Side panel -----
   const trays: Record<Color, { list: HTMLElement; adv: HTMLElement }> = {
     w: { list: el('div', 'bc-tray__list'), adv: el('span', 'bc-tray__adv') },
@@ -367,7 +387,7 @@ export function createHud(root: HTMLElement): Hud {
 
   // ----- Layers -----
   const bannerLayer = el('div', 'bc-banner-layer', { 'aria-live': 'assertive', role: 'alert' });
-  const hudLayer = el('div', 'bc-hud', undefined, topBar, panel);
+  const hudLayer = el('div', 'bc-hud', undefined, topBar, muteBtn, panel);
   const modalLayer = el('div', 'bc-modal-layer');
   root.append(hudLayer, bannerLayer, modalLayer);
 
@@ -529,6 +549,25 @@ export function createHud(root: HTMLElement): Hud {
         undefined,
         el('div', 'bc-field__label', undefined, 'Intro cinematic'),
         el('div', 'bc-seg bc-seg--3', { role: 'group', 'aria-label': 'Intro cinematic' }, ...introBtns),
+      );
+
+      const soundBtns = SOUND_MODES.map((m) =>
+        button(
+          'bc-seg__btn',
+          [el('span', 'bc-seg__label', undefined, m.label), el('span', 'bc-seg__hint', undefined, m.hint)],
+          () => {
+            audio.setMode(m.id); // applies at once and is saved, even without deploying
+            sync();
+          },
+          { 'aria-pressed': 'false', 'data-sound': m.id },
+        ),
+      );
+      const soundOptions = el(
+        'div',
+        'bc-field bc-field--sound',
+        undefined,
+        el('div', 'bc-field__label', undefined, 'Sound'),
+        el('div', 'bc-seg bc-seg--3', { role: 'group', 'aria-label': 'Sound' }, ...soundBtns),
       );
 
       const rotateInput = el('input', 'bc-switch__input', { type: 'checkbox', role: 'switch' });
@@ -707,6 +746,7 @@ export function createHud(root: HTMLElement): Hud {
         onlineOptions,
         fightOptions,
         introOptions,
+        soundOptions,
         deployBtn,
       );
 
@@ -750,6 +790,7 @@ export function createHud(root: HTMLElement): Hud {
         rotateInput.checked = state.autoRotate;
         for (const b of fightBtns) b.setAttribute('aria-pressed', String(b.dataset.fights === state.fights));
         for (const b of introBtns) b.setAttribute('aria-pressed', String(b.dataset.intro === state.intro));
+        for (const b of soundBtns) b.setAttribute('aria-pressed', String(b.dataset.sound === audio.mode));
       }
 
       function onKey(e: KeyboardEvent): void {

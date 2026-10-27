@@ -1,6 +1,7 @@
 // Wires the game state, 3D board, HUD, AI and online client together. Owns turn flow; holds no rendering or DOM code.
 import type { GameOverReason, GameResult, ServerMessage, Snapshot } from '../../../shared/protocol';
 import type { Engine } from '../ai/types';
+import { audio, sfx } from '../audio';
 import { Game, type PlayedMove } from '../core/game';
 import type { Color, MoveTarget, Square } from '../core/types';
 import data from '../data/pieces.json';
@@ -82,6 +83,7 @@ export class Controller {
     this.inMenu = true;
     this.stopAi();
     this.leaveOnline();
+    audio.music('menu');
     this.choice = await this.hud.showMenu();
     this.inMenu = false;
     this.board.setFightMode(this.choice.fights);
@@ -98,6 +100,7 @@ export class Controller {
     this.board.setCheck(null);
     this.setView(this.humanSide() ?? 'w', true);
     this.refreshHud();
+    audio.music('battle');
     void this.maybeAiMove();
   }
 
@@ -125,6 +128,7 @@ export class Controller {
       this.selected = square;
       this.targets = this.game.legalTargets(square);
       this.board.setSelection(square, this.targets);
+      sfx('select');
     } else {
       this.clearSelection();
     }
@@ -168,7 +172,10 @@ export class Controller {
       return;
     }
     if (outcome.over) return;
-    if (this.game.checkSquare()) this.hud.showBanner('CHECK!', 'check');
+    if (this.game.checkSquare()) {
+      this.hud.showBanner('CHECK!', 'check');
+      sfx('check');
+    }
     if (this.choice.mode === 'local' && this.choice.autoRotate) this.setView(this.game.turn, true);
     void this.maybeAiMove();
   }
@@ -209,6 +216,7 @@ export class Controller {
   private undo(): void {
     if (this.animating || this.online || this.game.ply === 0) return;
     this.stopAi();
+    sfx('undo');
     if (this.choice.mode === 'ai') {
       // Take back the AI's reply and the human's move, so it's the human's turn again.
       this.game.undo();
@@ -227,14 +235,18 @@ export class Controller {
   private async showResult(result: GameResult): Promise<void> {
     let title: string;
     let subtitle: string;
+    audio.music(null);
     if (result.winner === 'draw') {
       this.hud.showBanner('DRAW', 'draw');
+      sfx('draw');
       title = 'Draw';
       subtitle = RESULT_TEXT[result.reason];
     } else {
       this.hud.showBanner(result.reason === 'checkmate' ? 'CHECKMATE!' : 'VICTORY!', 'mate');
+      if (result.reason === 'checkmate') sfx('mate');
       const me = this.humanSide();
       title = me !== null && result.winner !== me ? 'Defeat!' : 'Victory!';
+      sfx(title === 'Defeat!' ? 'defeat' : 'victory', { delay: result.reason === 'checkmate' ? 1.1 : 0 });
       subtitle =
         result.reason === 'abandon'
           ? `${factionName(result.winner)} wins. ${RESULT_TEXT.abandon}`
@@ -301,11 +313,13 @@ export class Controller {
       case 'opponent': {
         const status = msg.status === 'joined' || msg.status === 'reconnected' ? 'connected' : msg.status;
         this.hud.setOpponentStatus(status, other(session.side ?? 'w'), session.opponentName);
+        if (status === 'connected') sfx('notify');
         if (msg.status === 'disconnected') this.hud.showBanner('Enemy signal lost…', 'info');
         if (msg.status === 'left') this.hud.showBanner('The enemy fled!', 'info');
         break;
       }
       case 'drawOffered':
+        sfx('notify');
         void this.hud.askDraw().then((accept) => {
           if (this.online === session) session.net.send({ t: 'answerDraw', accept });
         });
@@ -318,6 +332,7 @@ export class Controller {
         void this.animQueue.then(() => this.showResult(msg.result));
         break;
       case 'rematchOffered':
+        sfx('notify');
         this.hud.showBanner('The enemy wants a rematch!', 'info', 2500);
         break;
       case 'error':
@@ -353,6 +368,7 @@ export class Controller {
     this.syncBoardMarks();
     this.setView(s.you, true);
     this.refreshHud();
+    audio.music('battle');
     this.hud.setOpponentStatus(s.opponentConnected ? 'connected' : 'disconnected', other(s.you), session.opponentName);
     if (s.moves.length === 0) {
       this.hud.showBanner(s.you === 'w' ? 'You move first!' : 'Enemy moves first', 'info');

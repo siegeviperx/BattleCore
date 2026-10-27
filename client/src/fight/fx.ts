@@ -1,5 +1,6 @@
 // Effects shared by the board (capture poof) and the fight scenes: puffs, projectiles, blasts, stars.
 import * as THREE from 'three';
+import { sfx } from '../audio';
 import { ease, type Tweener } from '../render/tween';
 
 export type ProjectileKind = 'dart' | 'ball' | 'boulder' | 'missile' | 'bottle' | 'bullet';
@@ -8,6 +9,7 @@ const puffGeo = new THREE.IcosahedronGeometry(0.17, 1);
 
 /** A handful of puffs + paper confetti flying out. Resolves when the effect is gone. */
 export async function burst(parent: THREE.Object3D, tw: Tweener, at: THREE.Vector3, size = 1): Promise<void> {
+  sfx('poof', { vol: Math.min(1.3, 0.6 + size * 0.4), rate: 1.2 - Math.min(0.5, size * 0.15) });
   const parts: { m: THREE.Mesh; v: THREE.Vector3; s: number; spin: number }[] = [];
   const puffMat = new THREE.MeshStandardMaterial({ color: '#f3ead9', roughness: 1, transparent: true, emissive: '#806850', emissiveIntensity: 0.4 });
   const bitMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, transparent: true, side: THREE.DoubleSide });
@@ -174,6 +176,7 @@ export interface ShotOptions {
 export async function shoot(parent: THREE.Object3D, tw: Tweener, from: THREE.Vector3, to: THREE.Vector3, o: ShotOptions): Promise<void> {
   const p = projectileMesh(o.kind, o.color);
   parent.add(p);
+  sfx(`shot.${o.kind}`);
   const arc = o.arc ?? 0;
   const pos = new THREE.Vector3();
   const prev = from.clone();
@@ -218,6 +221,7 @@ export async function dizzyStars(anchor: THREE.Object3D, tw: Tweener, height: nu
     ring.add(s);
   }
   anchor.add(ring);
+  sfx('dizzy');
   await tw.add(duration, (t) => {
     ring.rotation.y = t * duration * 7;
     for (const s of ring.children) s.rotation.y = -ring.rotation.y;
@@ -236,6 +240,7 @@ export async function flameStream(parent: THREE.Object3D, tw: Tweener, from: THR
   const life = 0.35;
   let spawned = 0;
   const count = 22;
+  sfx('flame');
   await tw.add(duration + life, (t) => {
     const now = t * (duration + life);
     while (spawned < count && (spawned / count) * duration <= now) {

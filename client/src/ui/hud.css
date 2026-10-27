@@ -437,6 +437,36 @@
   color: #1b1208;
 }
 
+/* Speaker / quick mute (top-left) */
+.bc-mute {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: 16px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  pointer-events: auto;
+  border: 1px solid var(--bc-steel-edge);
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(42, 39, 35, 0.94), rgba(24, 22, 19, 0.94));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  color: var(--bc-ink-dim);
+  transition: color 150ms ease, transform 80ms ease;
+}
+
+.bc-mute:hover {
+  color: var(--bc-gold);
+}
+
+.bc-mute:active {
+  transform: translateY(1px);
+}
+
+.bc-mute[aria-pressed='true'] {
+  color: #ff7a5c;
+}
+
 /* Toolbar */
 .bc-toolbar {
   display: grid;
@@ -1445,9 +1475,10 @@
 /* ------------------------------------------------------------------ */
 
 @media (max-width: 600px) {
+  /* Leave room for the speaker button on both sides so the pill stays centred. */
   .bc-top {
-    left: 12px;
-    right: 12px;
+    left: 60px;
+    right: 60px;
     top: max(10px, env(safe-area-inset-top));
     gap: 6px;
   }
@@ -1455,6 +1486,13 @@
   .bc-opp {
     font-size: 12px;
     padding: 3px 10px 3px 6px;
+  }
+
+  .bc-mute {
+    top: max(10px, env(safe-area-inset-top));
+    left: 12px;
+    width: 38px;
+    height: 38px;
   }
 
   .bc-turn {

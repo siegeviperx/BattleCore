@@ -1,6 +1,7 @@
 // Procedural attack and knockout clips, picked by kind from data/fights.json. Each piece has one of each,
 // so 12 attacks + 12 knockouts cover every matchup. Moves only touch fighter.body (local space, +Z = opponent).
 import * as THREE from 'three';
+import { sfx } from '../audio';
 import { ease, type Tweener } from '../render/tween';
 import type { Fighter } from './fighters';
 import { blast, dizzyStars, flameStream, muzzleFlash, shoot, type ProjectileKind } from './fx';
@@ -79,6 +80,7 @@ const burst: AttackFn = async (c, s) => {
   if (s.then === 'tackle') {
     // Diaper-dive: belly flop onto the target, then scramble back.
     const reach = c.gap - 0.32;
+    sfx('swoosh');
     await tween(c, 0.28, (t) => {
       a.position.z = reach * t;
       a.position.y = Math.sin(Math.PI * t) * 0.35;
@@ -105,6 +107,7 @@ const snipe: AttackFn = async (c, s) => {
   const beamGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
   const beam = new THREE.Line(beamGeo, beamMat);
   c.fx.add(beam);
+  sfx('aim');
   const pos = beamGeo.attributes.position as THREE.BufferAttribute;
   await c.tw.add(c.T(0.6), (t) => {
     const from = muzzleWorld(c.attacker);
@@ -135,6 +138,7 @@ const pounce: AttackFn = async (c) => {
   const a = c.attacker.body;
   const reach = c.gap - 0.38;
   await tween(c, 0.16, (t) => a.scale.set(1 + 0.08 * t, 1 - 0.15 * t, 1 + 0.08 * t), ease.outCubic);
+  sfx('swoosh');
   await tween(c, 0.3, (t) => {
     a.scale.set(1, 1, 1);
     a.position.z = reach * t;
@@ -160,7 +164,9 @@ const charge: AttackFn = async (c) => {
     a.rotation.x = Math.sin(t * Math.PI * 6) * 0.06;
   });
   c.shake(0.02, c.T(0.3));
+  sfx('stomp', { vol: 0.5 });
   const reach = c.gap - 0.42;
+  sfx('swoosh', { rate: 0.7 });
   await tween(c, 0.2, (t) => {
     a.position.z = -0.18 + (reach + 0.18) * t;
     a.rotation.x = 0.15 * t;
@@ -175,6 +181,7 @@ const charge: AttackFn = async (c) => {
 const dive: AttackFn = async (c, s) => {
   const a = c.attacker.body;
   const top = 0.95;
+  sfx('swoosh', { rate: 0.8 });
   await tween(c, 0.35, (t) => {
     a.position.y = top * t;
     a.position.z = -0.25 * t;
@@ -190,6 +197,7 @@ const dive: AttackFn = async (c, s) => {
   await swoop;
   await c.hit(true);
   // Loop around back to the start.
+  sfx('swoosh');
   await tween(c, 0.4, (t) => {
     a.position.z = c.gap + 0.4 - (c.gap + 0.4) * t;
     a.position.y = top * (1 - t) + Math.sin(Math.PI * t) * 0.3;
@@ -204,10 +212,12 @@ const volley: AttackFn = async (c, s) => {
   if (s.windup === 'roar') {
     await tween(c, 0.2, (t) => (a.rotation.x = -0.25 * t), ease.outCubic);
     c.shake(0.05, c.T(0.5));
+    sfx('roar');
     await tween(c, 0.5, (t) => a.scale.setScalar(1 + Math.sin(t * Math.PI * 5) * 0.035));
     await tween(c, 0.15, (t) => (a.rotation.x = -0.25 * (1 - t)));
   } else if (s.windup === 'command') {
     // "Charge!": rear up and point, then lob.
+    sfx('cry');
     await tween(c, 0.25, (t) => {
       a.position.y = Math.sin(Math.PI * t) * 0.18;
       a.rotation.x = -0.2 * t;
@@ -227,6 +237,7 @@ const volley: AttackFn = async (c, s) => {
     lobs.push(
       shoot(c.fx, c.tw, from, to, { kind, color: s.color ?? '#2a2a2e', duration: c.T(0.5), arc: s.arc ?? 0.7, spin }).then(() => {
         void blast(c.fx, c.tw, to, heavy ? 1.2 : 0.7);
+        sfx('boom', { vol: heavy ? 1 : 0.6 });
         return c.hit(heavy);
       }),
     );
@@ -239,6 +250,7 @@ const volley: AttackFn = async (c, s) => {
 const twirl: AttackFn = async (c, s) => {
   const a = c.attacker.body;
   const turns = s.turns ?? 2;
+  sfx('swoosh', { rate: 1.2 });
   await tween(c, 0.55, (t) => {
     a.rotation.y = Math.PI * 2 * turns * t;
     a.position.y = Math.sin(Math.PI * t) * 0.15;
@@ -250,6 +262,7 @@ const twirl: AttackFn = async (c, s) => {
 const breath: AttackFn = async (c) => {
   const a = c.attacker.body;
   // Tail sweep: a full spin with a glancing hit as the tail comes around.
+  sfx('swoosh', { rate: 0.8 });
   let swept = false;
   await tween(c, 0.5, (t) => {
     a.rotation.y = Math.PI * 2 * t;
@@ -288,12 +301,14 @@ const pratfall: KnockoutFn = async (c) => {
     d.position.y = Math.sin(Math.PI * t) * 0.1;
   }, ease.inCubic);
   c.shake(0.025, c.T(0.15));
+  sfx('thud');
   await dizzyStars(c.defender.root, c.tw, c.defender.height * 0.55, c.T(0.75));
 };
 
 const spinout: KnockoutFn = async (c) => {
   const d = c.defender.body;
   const stars = dizzyStars(c.defender.root, c.tw, c.defender.height + 0.1, c.T(0.9));
+  sfx('swoosh', { rate: 1.3 });
   await tween(c, 0.75, (t) => {
     d.rotation.y = Math.PI * 4 * ease.outCubic(t);
     d.rotation.z = Math.sin(t * Math.PI * 6) * 0.2 * (1 - t);
@@ -301,10 +316,12 @@ const spinout: KnockoutFn = async (c) => {
   await stars;
   await tween(c, 0.25, (t) => (d.rotation.z = 1.4 * t), ease.inCubic);
   c.shake(0.02, c.T(0.12));
+  sfx('thud', { vol: 0.6 });
 };
 
 const launch: KnockoutFn = async (c) => {
   const d = c.defender.body;
+  sfx('whee');
   await tween(c, 0.65, (t) => {
     d.position.z = -1.3 * t;
     d.position.y = Math.sin(Math.PI * t * 0.85) * 1.2;
@@ -318,6 +335,7 @@ const topple: KnockoutFn = async (c) => {
   await tween(c, 0.25, (t) => (d.rotation.x = Math.sin(t * Math.PI * 3) * 0.08), ease.linear);
   await tween(c, 0.5, (t) => (d.rotation.x = -1.5 * t), ease.inCubic);
   c.shake(0.05, c.T(0.25));
+  sfx('thud', { rate: 0.8 });
   const dust = c.defender.root.localToWorld(new THREE.Vector3(0, 0.05, -c.defender.height * 0.6));
   void blast(c.fx, c.tw, dust, 0.9, '#d8c7a8');
   await tween(c, 0.18, (t) => (d.rotation.x = -1.5 + Math.sin(Math.PI * t) * 0.12), ease.outCubic);
@@ -327,6 +345,7 @@ const flatten: KnockoutFn = async (c) => {
   const d = c.defender.body;
   await tween(c, 0.16, (t) => d.scale.set(1 + 0.45 * t, 1 - 0.88 * t, 1 + 0.45 * t), ease.outCubic);
   c.shake(0.03, c.T(0.15));
+  sfx('squish');
   await dizzyStars(c.defender.root, c.tw, 0.2, c.T(0.7));
 };
 

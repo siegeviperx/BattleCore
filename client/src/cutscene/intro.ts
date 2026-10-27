@@ -3,6 +3,7 @@
 // cutouts. Characters are static models moved by code; transformations are swaps hidden behind puffs.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { sfx, type CueName } from '../audio';
 import type { BoardPiece, PieceType } from '../core/types';
 import { createFighter, type Fighter } from '../fight/fighters';
 import { blast, burst } from '../fight/fx';
@@ -147,6 +148,8 @@ export class IntroDirector {
       }, e);
     };
     const shake = (amp: number, s: number): Promise<void> => tween(s, (t) => (this.rig.shakeAmp = amp * (1 - t)), ease.linear);
+    /** A sound `s` seconds from now, unless the intro was skipped by then. */
+    const later = (s: number, cue: CueName, o?: Parameters<typeof sfx>[1]): void => void wait(s).then(() => alive() && sfx(cue, o));
 
     // Rigged fighters need their clips advanced; one long tween drives every mixer until the intro ends.
     let last = performance.now();
@@ -182,6 +185,7 @@ export class IntroDirector {
         f.root.scale.setScalar(FIG_SCALE * Math.max(0.15, t));
         f.body.rotation.x = (1 - t) * Math.PI * 2 * spin;
       }, ease.linear, delay);
+      if (alive()) sfx(fig.piece.color === 'b' ? 'clatter' : 'land');
       await tween(0.28, (t) => {
         f.root.position.y = home.y + Math.sin(Math.PI * t) * 0.22;
         f.body.scale.set(1 + 0.15 * Math.sin(Math.PI * t), 1 - 0.15 * Math.sin(Math.PI * t), 1);
@@ -189,8 +193,14 @@ export class IntroDirector {
     };
 
     /** A toddling walk: `bob`-high steps with a side-to-side sway; `stomp` shakes the camera on each footfall. */
-    const toddle = (obj: THREE.Object3D, from: V3, to: V3, s: number, steps: number, bob: number, stomp: number): Promise<void> =>
-      tween(s, (t) => {
+    const toddle = (obj: THREE.Object3D, from: V3, to: V3, s: number, steps: number, bob: number, stomp: number, onStep?: () => void): Promise<void> => {
+      let stepped = 0;
+      return tween(s, (t) => {
+        const n = Math.floor(t * steps);
+        if (n > stepped) {
+          stepped = n;
+          onStep?.();
+        }
         obj.position.lerpVectors(from, to, t);
         const phase = t * steps * Math.PI;
         obj.position.y = from.y + Math.abs(Math.sin(phase)) * bob;
@@ -198,6 +208,7 @@ export class IntroDirector {
         if (stomp && Math.abs(Math.sin(phase)) < 0.08) this.rig.shakeAmp = stomp;
         else if (stomp) this.rig.shakeAmp *= 0.85;
       }, ease.linear);
+    };
 
     const dinos = pieces.filter((p) => p.color === 'b');
     const babies = pieces.filter((p) => p.color === 'w');
@@ -216,7 +227,7 @@ export class IntroDirector {
     giant.rotation.y = Math.PI / 2;
     cut(v(-1.5, 1, 6.5), v(-4, 5.5, -8.5));
     void camTo(v(0, 1.2, 6), v(0, 5.5, -8.5), 4.6);
-    await toddle(giant, gStart, gSpot, 4, 6, 0.35, 0.18);
+    await toddle(giant, gStart, gSpot, 4, 6, 0.35, 0.18, () => sfx('stomp'));
     await tween(0.6, (t) => (giant.rotation.y = (Math.PI / 2) * (1 - t)));
     this.rig.shakeAmp = 0;
     if (!alive()) return;
@@ -227,6 +238,8 @@ export class IntroDirector {
     const sack = (): V3 => v(gSpot.x, BOARD_Y + GIANT_H * 0.5, gSpot.z + GIANT_H * 0.22);
     void tween(2.6, (t) => (giant.rotation.z = Math.sin(t * Math.PI * 12) * 0.06 * (1 - t)), ease.linear);
     void shake(0.12, 2.6);
+    sfx('rumble');
+    later(0.9, 'rumble');
     const restores: (() => void)[] = [];
     const landed = dinos.map((p, i) => {
       const fig = spawn(p);
@@ -242,6 +255,7 @@ export class IntroDirector {
     const dinoFigs = figures.filter((fig) => fig.piece.color === 'b');
     cut(v(0, 2.4, 1.2), v(0, 0.6, -3));
     void camTo(v(0, 2.8, 2.2), v(0, 0.6, -3), 6);
+    sfx('rumble', { rate: 1.5 });
     await tween(1.2, (t) => {
       for (const { f } of dinoFigs) f.body.rotation.z = (Math.random() - 0.5) * 0.25 * t;
     }, ease.linear);
@@ -250,12 +264,15 @@ export class IntroDirector {
       const at = home.clone().setY(home.y + 0.4);
       void burst(stage, tw, at, 0.7);
       void blast(stage, tw, at, 0.5, i % 2 ? '#ffd35a' : '#ff8a3a');
+      sfx('sparkle');
       void wait(0.18).then(() => alive() && restores[i]?.());
       f.body.scale.setScalar(1);
       await wait(0.06);
     }
     await wait(0.6);
     void shake(0.16, 1.1);
+    sfx('roar', { vol: 1.3, rate: 0.85 });
+    later(0.12, 'roar', { vol: 1.1, rate: 1.1 });
     await tween(1.1, (t) => {
       const s = 1 + Math.sin(Math.PI * t) * 0.18;
       for (const { f } of dinoFigs) f.body.scale.set(s, s, s);
@@ -263,7 +280,7 @@ export class IntroDirector {
     if (!alive()) return;
 
     // 5. Baby Dino waddles up on the baby side, wearing its baby-print shirt; the Giant Baby wanders off.
-    void toddle(giant, gSpot, v(15, BOARD_Y, -9), 4, 6, 0.35, 0).then(() => stage.remove(giant));
+    void toddle(giant, gSpot, v(15, BOARD_Y, -9), 4, 6, 0.35, 0, () => sfx('stomp', { vol: 0.35 })).then(() => stage.remove(giant));
     giant.rotation.y = -Math.PI / 2;
     const dino = character('baby-dino', DINO_H, '#3e9b45');
     stage.add(dino);
@@ -273,7 +290,8 @@ export class IntroDirector {
     dino.rotation.y = Math.PI / 2;
     cut(v(0, 2.2, 2.8), v(-3, 2.6, 8.4));
     void camTo(v(0, 2.4, 2.6), v(0, 2.8, 8.2), 3.6);
-    await toddle(dino, dStart, dSpot, 3.2, 8, 0.25, 0.05);
+    sfx('sting.cute');
+    await toddle(dino, dStart, dSpot, 3.2, 8, 0.25, 0.05, () => sfx('squeak'));
     await tween(0.5, (t) => (dino.rotation.y = Math.PI / 2 + (Math.PI / 2) * t));
     if (!alive()) return;
 
@@ -282,6 +300,7 @@ export class IntroDirector {
     const chest = v(dSpot.x, BOARD_Y + DINO_H * 0.45, dSpot.z - DINO_H * 0.15);
     void burst(stage, tw, chest, 2.4);
     void blast(stage, tw, chest, 1.4, '#ffffff');
+    sfx('pop', { rate: 0.6 });
     await wait(0.15);
     stage.remove(dino);
     const bare = character('baby-dino-noshirt', DINO_H, '#3e9b45');
@@ -303,6 +322,10 @@ export class IntroDirector {
     void camTo(v(4.5, 1.1, 0.6), v(3.5, 0.5, 2.5), 4.2, ease.linear);
     void tween(1.2, (t) => bare.position.set(dSpot.x - 8 * t, BOARD_Y, dSpot.z + 2 * t), ease.inCubic).then(() => stage.remove(bare));
     const offsets = babyFigs.map(() => Math.random() * Math.PI * 2);
+    later(0.3, 'giggle');
+    later(1.4, 'giggle', { rate: 1.15 });
+    later(2.5, 'giggle', { rate: 0.9 });
+    later(3.2, 'giggle', { rate: 1.05 });
     await tween(4, (t) => {
       for (const [i, { f, home, yaw }] of babyFigs.entries()) {
         const ph = t * Math.PI * 6 + offsets[i];
@@ -314,6 +337,7 @@ export class IntroDirector {
 
     // 8. Gets serious: everyone snaps round to face the dinos and squares up.
     cut(v(0.5, 0.75, 1.1), v(0.5, 0.45, 2.5));
+    sfx('scratch');
     await tween(0.35, (t) => {
       for (const { f, home, yaw } of babyFigs) {
         f.root.rotation.y += (yaw - f.root.rotation.y) * t;
@@ -335,6 +359,7 @@ export class IntroDirector {
       void camTo(v(home.x + 0.15, head.y, home.z - 1.0), v(home.x, head.y - 0.12, home.z), 1.3, ease.outCubic);
       await wait(0.35);
       void blast(stage, tw, head, 0.35, '#fff3b0');
+      sfx('snap');
       await tween(0.4, (t) => f.body.scale.setScalar(1 + Math.sin(Math.PI * t) * 0.16), ease.outCubic);
       await wait(0.55);
       if (!alive()) return;
@@ -343,6 +368,7 @@ export class IntroDirector {
 
     // 10. Standoff: a wide side shot of both armies.
     cut(v(11, 3, 0.6), v(0, 0.4, 0));
+    sfx('sting.standoff');
     await camTo(v(9.5, 2.6, 0.3), v(0, 0.4, 0), 3);
     if (!alive()) return;
 
@@ -362,6 +388,7 @@ export class IntroDirector {
     }
     stage.add(sweepRow);
     void camTo(shot.home.pos, shot.home.target, 3, ease.inOutCubic);
+    sfx('sweep');
     const flat = new Set<Figure>();
     const popped = new Set<object>();
     await tween(2, (t) => {
@@ -371,6 +398,7 @@ export class IntroDirector {
       for (const fig of figures) {
         if (flat.has(fig) || fig.home.x > x) continue;
         flat.add(fig);
+        sfx('flutter', { vol: 0.5 });
         void tween(0.18, (k) => fig.f.root.scale.set(FIG_SCALE * (1 - k) + 0.001, FIG_SCALE, FIG_SCALE), ease.inCubic);
       }
       for (const p of cutouts) {
