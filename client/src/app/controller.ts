@@ -6,7 +6,7 @@ import type { Color, MoveTarget, Square } from '../core/types';
 import data from '../data/pieces.json';
 import { OnlineClient, type ConnectionState } from '../net/client';
 import type { BoardView } from '../render/types';
-import type { Hud, MenuChoice, OnlineRequest } from '../ui/types';
+import type { Hud, IntroMode, MenuChoice, OnlineRequest } from '../ui/types';
 
 /** Minimum time the AI appears to think, so its replies don't feel instant. */
 const MIN_AI_DELAY_MS = 450;
@@ -64,8 +64,8 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    // The intro cinematic opens the app the first time (or always, with ?intro=1), before the menu.
-    if (shouldPlayIntro()) {
+    // The intro cinematic opens the app (per the menu's intro setting, or always with ?intro=1), before the menu.
+    if (shouldPlayIntro(this.hud.introMode())) {
       this.setView('w', false);
       this.hud.setCinematic(true);
       await this.board.playIntro(this.game.pieces());
@@ -412,8 +412,9 @@ export class Controller {
 
 const INTRO_SEEN_KEY = 'battlecore.intro.seen';
 
-function shouldPlayIntro(): boolean {
+function shouldPlayIntro(mode: IntroMode): boolean {
   if (new URLSearchParams(location.search).has('intro')) return true;
+  if (mode !== 'first') return mode === 'always';
   try {
     return localStorage.getItem(INTRO_SEEN_KEY) === null;
   } catch {

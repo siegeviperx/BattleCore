@@ -67,8 +67,8 @@ Title ─► Mode Select ─► Intro Cinematic (skippable) ─► Match ─► 
 
 ## 4. Intro Cinematic (~45–60 s)
 
-Plays at the start of every match the first time. After that it's skippable by tapping or pressing a key,
-and there's a setting for "always / first time only / never".
+Plays when the game first loads, before the main menu. Any key or tap skips it, and the menu's
+"Intro cinematic" setting chooses always / first time only (default) / never.
 
 | # | Beat | Duration | Notes |
 |---|---|---|---|

@@ -19,6 +19,9 @@ export interface MenuChoice {
 
 export type BannerKind = 'check' | 'mate' | 'draw' | 'info';
 
+/** When the intro cinematic plays on launch. */
+export type IntroMode = 'always' | 'first' | 'never';
+
 export type OpponentStatus = 'waiting' | 'connected' | 'disconnected' | 'left';
 
 export interface Lobby {
@@ -46,6 +49,8 @@ export interface Hud {
   onMenu(cb: () => void): void;
   /** Hide the HUD for a cutscene. */
   setCinematic(on: boolean): void;
+  /** The saved intro preference (read before the menu opens). */
+  introMode(): IntroMode;
 
   // --- Online play ---
   /** Overlay shown while connecting / waiting for an opponent. `code` is null while still connecting. */

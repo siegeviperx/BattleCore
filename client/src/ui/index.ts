@@ -2,9 +2,9 @@ import './hud.css';
 import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import data from '../data/pieces.json';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
-import type { BannerKind, Hud, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
+import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
 
-export type { Hud, MenuChoice, BannerKind, Lobby, OnlineRequest, OpponentStatus } from './types';
+export type { Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -32,6 +32,11 @@ const FIGHT_MODES: { id: FightMode; label: string; hint: string }[] = [
   { id: 'full', label: 'Full', hint: 'Every capture' },
   { id: 'quick', label: 'Quick', hint: 'Short & sharp' },
   { id: 'off', label: 'Off', hint: 'Just poof' },
+];
+const INTRO_MODES: { id: IntroMode; label: string; hint: string }[] = [
+  { id: 'always', label: 'Always', hint: 'Every launch' },
+  { id: 'first', label: 'First time', hint: 'Just once' },
+  { id: 'never', label: 'Never', hint: 'Straight in' },
 ];
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
 const PROMO_KEYS: Record<string, PieceType> = { q: 'q', r: 'r', b: 'b', n: 'n' };
@@ -130,6 +135,7 @@ interface Saved {
   onlineAction: 'create' | 'join';
   onlineSide: OnlineSide;
   playerName: string;
+  intro: IntroMode;
 }
 
 const DEFAULTS: Saved = {
@@ -141,6 +147,7 @@ const DEFAULTS: Saved = {
   onlineAction: 'create',
   onlineSide: 'random',
   playerName: '',
+  intro: 'first',
 };
 
 function loadSaved(): Saved {
@@ -157,6 +164,7 @@ function loadSaved(): Saved {
       onlineAction: p.onlineAction === 'join' ? 'join' : 'create',
       onlineSide: p.onlineSide === 'w' || p.onlineSide === 'b' ? p.onlineSide : 'random',
       playerName: typeof p.playerName === 'string' ? cleanName(p.playerName) : '',
+      intro: INTRO_MODES.some((m) => m.id === p.intro) ? (p.intro as IntroMode) : DEFAULTS.intro,
     };
   } catch {
     return { ...DEFAULTS };
@@ -503,6 +511,26 @@ export function createHud(root: HTMLElement): Hud {
         el('div', 'bc-seg bc-seg--3', { role: 'group', 'aria-label': 'Capture fights' }, ...fightBtns),
       );
 
+      const introBtns = INTRO_MODES.map((m) =>
+        button(
+          'bc-seg__btn',
+          [el('span', 'bc-seg__label', undefined, m.label), el('span', 'bc-seg__hint', undefined, m.hint)],
+          () => {
+            state.intro = m.id;
+            save(state); // takes effect on the next launch, so keep it even without deploying
+            sync();
+          },
+          { 'aria-pressed': 'false', 'data-intro': m.id },
+        ),
+      );
+      const introOptions = el(
+        'div',
+        'bc-field bc-field--intro',
+        undefined,
+        el('div', 'bc-field__label', undefined, 'Intro cinematic'),
+        el('div', 'bc-seg bc-seg--3', { role: 'group', 'aria-label': 'Intro cinematic' }, ...introBtns),
+      );
+
       const rotateInput = el('input', 'bc-switch__input', { type: 'checkbox', role: 'switch' });
       rotateInput.addEventListener('change', () => {
         state.autoRotate = rotateInput.checked;
@@ -678,6 +706,7 @@ export function createHud(root: HTMLElement): Hud {
         localOptions,
         onlineOptions,
         fightOptions,
+        introOptions,
         deployBtn,
       );
 
@@ -720,6 +749,7 @@ export function createHud(root: HTMLElement): Hud {
         for (const b of levelBtns) b.setAttribute('aria-pressed', String(b.dataset.level === state.level));
         rotateInput.checked = state.autoRotate;
         for (const b of fightBtns) b.setAttribute('aria-pressed', String(b.dataset.fights === state.fights));
+        for (const b of introBtns) b.setAttribute('aria-pressed', String(b.dataset.intro === state.intro));
       }
 
       function onKey(e: KeyboardEvent): void {
@@ -1129,6 +1159,7 @@ export function createHud(root: HTMLElement): Hud {
     onFlip: (cb) => void flipCbs.push(cb),
     onMenu: (cb) => void menuCbs.push(cb),
     setCinematic,
+    introMode: () => loadSaved().intro,
     showLobby,
     setOnlineMode,
     setOpponentStatus,
