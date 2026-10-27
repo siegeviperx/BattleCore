@@ -1,0 +1,39 @@
+{
+  "factions": {
+    "w": {
+      "name": "Baby Army",
+      "short": "Babies",
+      "primary": "#5f6b3c",
+      "secondary": "#c9b27c",
+      "base": "#1c1c1c",
+      "baseEmblem": "star"
+    },
+    "b": {
+      "name": "Armored Dinos",
+      "short": "Dinos",
+      "primary": "#8a2620",
+      "secondary": "#4a4a4f",
+      "base": "#9c1f1a",
+      "baseEmblem": "claw"
+    }
+  },
+  "pieces": {
+    "w": {
+      "p": { "name": "Baby Rifleman", "icon": "👶" },
+      "n": { "name": "Jetpack Baby", "icon": "🚀" },
+      "b": { "name": "Sniper Baby", "icon": "🎯" },
+      "r": { "name": "Baby Watchtower", "icon": "🏰" },
+      "q": { "name": "Caped Baby Queen", "icon": "👸" },
+      "k": { "name": "Baby Commander", "icon": "🤴" }
+    },
+    "b": {
+      "p": { "name": "Raptor Trooper", "icon": "🦎" },
+      "n": { "name": "Ptero Gunship", "icon": "🦅" },
+      "b": { "name": "Trike Tank", "icon": "🦏" },
+      "r": { "name": "Dino Fortress", "icon": "🏯" },
+      "q": { "name": "Spinosaurus", "icon": "🐊" },
+      "k": { "name": "Armored T-Rex", "icon": "🦖" }
+    }
+  },
+  "glyphs": { "p": "♟", "n": "♞", "b": "♝", "r": "♜", "q": "♛", "k": "♚" }
+}

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BattleCore board preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1210; }
+      #app { position: fixed; inset: 0; }
+      #hud { position: fixed; left: 8px; top: 8px; color: #fff; font: 12px sans-serif; background: rgba(0,0,0,.45); padding: 6px 8px; border-radius: 6px; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud">click piece → click square (pseudo-moves) · V flip view · F flip instantly · C toggle check · R reset</div>
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>

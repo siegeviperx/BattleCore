@@ -10,8 +10,23 @@ plays an animated 3D fight scene.
 
 - **Design doc:** [docs/DESIGN.md](docs/DESIGN.md)
 - **Modes:** vs Computer · Local 2-Player · Online
-- **Stack:** TypeScript · Vite · Three.js · chess.js · Stockfish WASM · Node WebSocket server
+- **Stack:** TypeScript · Vite · Three.js · chess.js · custom alpha-beta AI · Node WebSocket server
 
 ## Status
 
-Pre-production. Next up: **M1, playable chess** with placeholder cutouts.
+**M1, playable chess:** done. A 3D board with placeholder cutout pieces, full rules, vs Computer
+(our own AI, 4 difficulty levels) and Local 2-Player. Next up: **M2, online play**.
+
+## Run it
+
+Requires Node 20+.
+
+```sh
+cd client
+npm install
+npm run dev        # http://localhost:5173
+npm test           # rules + AI tests (perft, mate finding)
+npm run build      # production build in client/dist
+```
+
+Dev-only preview pages: `/src/render/preview.html` (board and animations), `/src/ui/preview.html` (menus and HUD).

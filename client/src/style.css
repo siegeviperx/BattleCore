@@ -1,0 +1,36 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1410;
+  color: #f3ead6;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#board,
+#hud {
+  position: fixed;
+  inset: 0;
+}
+
+#hud {
+  pointer-events: none;
+}
+
+/* Keep the board clear of the HUD side panel (see ui/hud.css .bc-panel widths). */
+#board {
+  right: 290px;
+}
+
+@media (max-width: 900px) {
+  #board {
+    right: 250px;
+  }
+}
+
+@media (max-width: 600px) {
+  #board {
+    right: 0;
+  }
+}

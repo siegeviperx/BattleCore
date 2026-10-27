@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>BattleCore HUD preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&display=swap" rel="stylesheet" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body { background: radial-gradient(120% 90% at 50% 100%, #7a3a1c 0%, #2a1a14 45%, #0e0c10 100%); }
+      #fake-board {
+        position: absolute; inset: 0; display: grid; place-items: center;
+        color: #ffffff22; font: 700 14px system-ui; cursor: pointer;
+      }
+      #fake-board div {
+        width: min(60vmin, 520px); aspect-ratio: 1;
+        background: repeating-conic-gradient(#d8cba8 0 25%, #3b3328 0 50%) 0 0 / 25% 25%;
+        opacity: .5; transform: perspective(800px) rotateX(35deg); border-radius: 6px;
+      }
+      #ui { position: absolute; inset: 0; pointer-events: none; }
+      #log { position: absolute; left: 8px; bottom: 8px; color: #fff8; font: 12px monospace; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="fake-board"><div></div></div>
+    <div id="ui"></div>
+    <div id="log"></div>
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>

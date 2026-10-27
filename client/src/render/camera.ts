@@ -1,0 +1,106 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { Color } from '../core/types';
+import { ease, Tweener } from './tween';
+
+const FOV = 42;
+/** Default polar angle (from +Y), matches a camera at about (0, 9, 8.5). */
+const DEFAULT_POLAR = Math.atan2(8.5, 9);
+const BASE_DIST = Math.hypot(8.5, 9);
+/** Half-width (world units) that must fit horizontally. */
+const HALF_WIDTH = 5.0;
+
+export class CameraRig {
+  readonly camera: THREE.PerspectiveCamera;
+  readonly controls: OrbitControls;
+  private side: Color = 'w';
+  private animating = false;
+
+  constructor(dom: HTMLElement, private tw: Tweener) {
+    this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
+    this.controls = new OrbitControls(this.camera, dom);
+    const c = this.controls;
+    c.enablePan = false;
+    c.enableDamping = true;
+    c.dampingFactor = 0.08;
+    c.minPolarAngle = 0.12;
+    c.maxPolarAngle = 1.32;
+    c.rotateSpeed = 0.6;
+    c.zoomSpeed = 0.8;
+    c.target.set(0, 0, 0);
+    this.place(this.azimuthFor('w'), DEFAULT_POLAR, BASE_DIST);
+  }
+
+  private azimuthFor(side: Color): number {
+    return side === 'w' ? 0 : Math.PI;
+  }
+
+  /** Distance that fits the board for the current aspect. */
+  fitDistance(): number {
+    const aspect = this.camera.aspect;
+    const vHalf = THREE.MathUtils.degToRad(FOV / 2);
+    const hHalf = Math.atan(Math.tan(vHalf) * aspect);
+    return Math.max(BASE_DIST, HALF_WIDTH / Math.tan(hHalf) + 2.5);
+  }
+
+  setAspect(aspect: number): void {
+    this.camera.aspect = aspect;
+    this.camera.updateProjectionMatrix();
+    const fit = this.fitDistance();
+    this.controls.minDistance = Math.min(7, fit * 0.6);
+    this.controls.maxDistance = fit * 1.6;
+    if (!this.animating) {
+      const s = this.spherical();
+      this.place(s.theta, s.phi, fit);
+    }
+  }
+
+  private spherical(): THREE.Spherical {
+    return new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target));
+  }
+
+  private place(theta: number, phi: number, radius: number): void {
+    const v = new THREE.Vector3().setFromSpherical(new THREE.Spherical(radius, phi, theta));
+    this.camera.position.copy(this.controls.target).add(v);
+    this.camera.lookAt(this.controls.target);
+  }
+
+  setViewSide(color: Color, animate: boolean): void {
+    this.side = color;
+    const targetTheta = this.azimuthFor(color);
+    const fit = this.fitDistance();
+    if (!animate) {
+      this.animating = false;
+      this.place(targetTheta, DEFAULT_POLAR, fit);
+      this.controls.update();
+      return;
+    }
+    const s = this.spherical();
+    let dTheta = targetTheta - s.theta;
+    dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
+    if (Math.abs(Math.abs(dTheta) - Math.PI) < 1e-3) dTheta = Math.PI; // pick a consistent direction
+    const from = { theta: s.theta, phi: s.phi, r: s.radius };
+    this.animating = true;
+    this.controls.enabled = false;
+    const mySide = color;
+    void this.tw
+      .add(
+        0.8,
+        (t) => {
+          if (this.side !== mySide) return;
+          this.place(from.theta + dTheta * t, from.phi + (DEFAULT_POLAR - from.phi) * t, from.r + (fit - from.r) * t);
+        },
+        { ease: ease.inOutCubic },
+      )
+      .then(() => {
+        if (this.side !== mySide) return;
+        this.animating = false;
+        this.controls.enabled = true;
+        this.controls.update();
+      });
+  }
+
+  update(): void {
+    if (!this.animating) this.controls.update();
+  }
+}
