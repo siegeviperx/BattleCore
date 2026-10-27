@@ -1,8 +1,8 @@
 import type { Color, FightMode, Level, PieceType } from '../core/types';
 
 export type OnlineRequest =
-  | { action: 'create'; side: Color | 'random' }
-  | { action: 'join'; code: string };
+  | { action: 'create'; side: Color | 'random'; name: string }
+  | { action: 'join'; code: string; name: string };
 
 export interface MenuChoice {
   mode: 'ai' | 'local' | 'online';
@@ -50,7 +50,8 @@ export interface Hud {
   showLobby(code: string | null, side: Color | null): Lobby;
   /** Online games: swap Undo for Resign + Offer Draw, show the opponent status chip. False restores offline controls. */
   setOnlineMode(online: boolean): void;
-  setOpponentStatus(status: OpponentStatus, side: Color): void;
+  /** `name` replaces the faction label on the chip when the opponent gave one. */
+  setOpponentStatus(status: OpponentStatus, side: Color, name?: string | null): void;
   onResign(cb: () => void): void;
   onOfferDraw(cb: () => void): void;
   /** Ask whether to accept the opponent's draw offer. */

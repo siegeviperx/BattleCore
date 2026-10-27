@@ -127,6 +127,27 @@ describe('lobby', () => {
     expect(snapH).toMatchObject({ you: 'b', started: true, opponentConnected: true });
   });
 
+  it('shares cleaned player names in snapshots', async () => {
+    const host = await Client.open(srv.port);
+    host.send({ t: 'create', side: 'w', name: '  Ada\n  the   Great  ' });
+    const { code } = await host.next('seated');
+    expect(await host.snapshot()).toMatchObject({ youName: 'Ada the Great', opponentName: null });
+    const guest = await Client.open(srv.port);
+    guest.send({ t: 'join', code, name: 'Rex' });
+    await guest.next('seated');
+    expect(await guest.snapshot()).toMatchObject({ youName: 'Rex', opponentName: 'Ada the Great' });
+    await host.next('opponent');
+    expect(await host.snapshot()).toMatchObject({ youName: 'Ada the Great', opponentName: 'Rex' });
+  });
+
+  it('names are optional; a non-string name is rejected', async () => {
+    const { snapH } = await pair();
+    expect(snapH).toMatchObject({ youName: null, opponentName: null });
+    const c = await Client.open(srv.port);
+    c.send({ t: 'create', side: 'w', name: 42 });
+    await c.error('bad-request');
+  });
+
   it('join is case-insensitive and trims', async () => {
     const host = await Client.open(srv.port);
     host.send({ t: 'create', side: 'random' });

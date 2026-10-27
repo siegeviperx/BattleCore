@@ -1,4 +1,5 @@
 import './hud.css';
+import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import data from '../data/pieces.json';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
 import type { BannerKind, Hud, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
@@ -128,6 +129,7 @@ interface Saved {
   fights: FightMode;
   onlineAction: 'create' | 'join';
   onlineSide: OnlineSide;
+  playerName: string;
 }
 
 const DEFAULTS: Saved = {
@@ -138,6 +140,7 @@ const DEFAULTS: Saved = {
   fights: 'full',
   onlineAction: 'create',
   onlineSide: 'random',
+  playerName: '',
 };
 
 function loadSaved(): Saved {
@@ -153,6 +156,7 @@ function loadSaved(): Saved {
       fights: FIGHT_MODES.some((f) => f.id === p.fights) ? (p.fights as FightMode) : DEFAULTS.fights,
       onlineAction: p.onlineAction === 'join' ? 'join' : 'create',
       onlineSide: p.onlineSide === 'w' || p.onlineSide === 'b' ? p.onlineSide : 'random',
+      playerName: typeof p.playerName === 'string' ? cleanName(p.playerName) : '',
     };
   } catch {
     return { ...DEFAULTS };
@@ -583,6 +587,33 @@ export function createHud(root: HTMLElement): Hud {
         }
       });
 
+      const nameInput = el('input', 'bc-name', {
+        type: 'text',
+        id: 'bc-player-name',
+        autocomplete: 'nickname',
+        spellcheck: 'false',
+        enterkeyhint: 'go',
+        maxlength: String(NAME_MAX_LENGTH),
+        placeholder: 'Optional',
+      });
+      nameInput.value = state.playerName;
+      nameInput.addEventListener('input', () => {
+        state.playerName = nameInput.value;
+      });
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          deployBtn.click();
+        }
+      });
+      const namePane = el(
+        'div',
+        'bc-field',
+        undefined,
+        el('label', 'bc-field__label', { for: 'bc-player-name' }, 'Your name'),
+        nameInput,
+      );
+
       const createPane = el(
         'div',
         'bc-field',
@@ -603,6 +634,7 @@ export function createHud(root: HTMLElement): Hud {
         'bc-options',
         undefined,
         el('div', 'bc-seg bc-seg--2', { role: 'group', 'aria-label': 'Online game' }, ...actionBtns),
+        namePane,
         createPane,
         joinPane,
       );
@@ -612,14 +644,18 @@ export function createHud(root: HTMLElement): Hud {
 
       const deployBtn = button('bc-deploy', 'Deploy!', () => {
         if (!canDeploy()) return;
+        state.playerName = cleanName(state.playerName);
         save(state);
         let choice: MenuChoice;
         const fights = state.fights;
         if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false, fights };
         else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate, fights };
         else {
+          const name = state.playerName;
           const online: OnlineRequest =
-            state.onlineAction === 'join' ? { action: 'join', code: joinCode } : { action: 'create', side: state.onlineSide };
+            state.onlineAction === 'join'
+              ? { action: 'join', code: joinCode, name }
+              : { action: 'create', side: state.onlineSide, name };
           choice = { mode: 'online', autoRotate: false, fights, online };
         }
         close();
@@ -980,11 +1016,12 @@ export function createHud(root: HTMLElement): Hud {
     left: 'Opponent left',
   };
 
-  function setOpponentStatus(status: OpponentStatus, side: Color): void {
+  function setOpponentStatus(status: OpponentStatus, side: Color, name?: string | null): void {
     oppChip.dataset.status = status;
     oppChip.setAttribute('style', facVars(side));
     oppIcon.textContent = PIECES[side].k.icon;
-    oppName.textContent = FACTIONS[side].short;
+    oppName.textContent = name || FACTIONS[side].short;
+    oppChip.title = name ? `${name} (${FACTIONS[side].name})` : '';
     oppText.textContent = OPP_TEXT[status];
   }
 

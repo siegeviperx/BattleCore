@@ -28,6 +28,7 @@ const other = (c: Color): Color => (c === 'w' ? 'b' : 'w');
 interface OnlineSession {
   net: OnlineClient;
   side: Color | null;
+  opponentName: string | null;
   started: boolean;
   over: boolean;
 }
@@ -245,7 +246,7 @@ export class Controller {
 
   private async startOnline(request: OnlineRequest): Promise<void> {
     const net = new OnlineClient();
-    const session: OnlineSession = { net, side: null, started: false, over: false };
+    const session: OnlineSession = { net, side: null, opponentName: null, started: false, over: false };
     this.online = session;
     this.showLobby(session, null);
     net.onMessage((msg) => this.onServerMessage(session, msg));
@@ -258,7 +259,8 @@ export class Controller {
       return;
     }
     if (this.online !== session) return;
-    net.send(request.action === 'create' ? { t: 'create', side: request.side } : { t: 'join', code: request.code });
+    const name = request.name || undefined;
+    net.send(request.action === 'create' ? { t: 'create', side: request.side, name } : { t: 'join', code: request.code, name });
   }
 
   private showLobby(session: OnlineSession, code: string | null): void {
@@ -289,7 +291,7 @@ export class Controller {
         break;
       case 'opponent': {
         const status = msg.status === 'joined' || msg.status === 'reconnected' ? 'connected' : msg.status;
-        this.hud.setOpponentStatus(status, other(session.side ?? 'w'));
+        this.hud.setOpponentStatus(status, other(session.side ?? 'w'), session.opponentName);
         if (msg.status === 'disconnected') this.hud.showBanner('Enemy signal lost…', 'info');
         if (msg.status === 'left') this.hud.showBanner('The enemy fled!', 'info');
         break;
@@ -323,6 +325,7 @@ export class Controller {
 
   private applySnapshot(session: OnlineSession, s: Snapshot): void {
     session.side = s.you;
+    session.opponentName = s.opponentName ?? null;
     session.started = s.started;
     session.over = s.result !== null;
     this.hud.setOnlineMode(true);
@@ -341,7 +344,7 @@ export class Controller {
     this.syncBoardMarks();
     this.setView(s.you, true);
     this.refreshHud();
-    this.hud.setOpponentStatus(s.opponentConnected ? 'connected' : 'disconnected', other(s.you));
+    this.hud.setOpponentStatus(s.opponentConnected ? 'connected' : 'disconnected', other(s.you), session.opponentName);
     if (s.moves.length === 0) {
       this.hud.showBanner(s.you === 'w' ? 'You move first!' : 'Enemy moves first', 'info');
     }

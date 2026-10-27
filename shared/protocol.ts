@@ -11,6 +11,14 @@ export const ROOM_CODE_LENGTH = 6;
 /** Room code alphabet: no 0/O/1/I/L to avoid misreads. */
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
+export const NAME_MAX_LENGTH = 16;
+
+/** A player name as the other player sees it: printable, single-spaced, at most NAME_MAX_LENGTH. '' = no name. */
+export function cleanName(raw: string): string {
+  const flat = raw.replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim();
+  return [...flat].slice(0, NAME_MAX_LENGTH).join('').trim();
+}
+
 export type Side = 'w' | 'b';
 export type SidePreference = Side | 'random';
 
@@ -44,12 +52,15 @@ export interface Snapshot {
   result: GameResult | null;
   /** A draw offer from the opponent is pending. */
   drawOffered: boolean;
+  /** Player names (null = none given). */
+  youName: string | null;
+  opponentName: string | null;
 }
 
 export type ClientMessage =
   | { t: 'hello'; version: number }
-  | { t: 'create'; side: SidePreference }
-  | { t: 'join'; code: string }
+  | { t: 'create'; side: SidePreference; name?: string }
+  | { t: 'join'; code: string; name?: string }
   | { t: 'resume'; code: string; token: string }
   /** `ply` = number of moves already played when this move was made (rejects stale/duplicate sends). */
   | { t: 'move'; uci: string; ply: number }

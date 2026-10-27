@@ -16,13 +16,17 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   }
   if (!isObj(data) || typeof data.t !== 'string') return null;
   const m = data;
+  // Optional player name on create/join: absent is fine, anything but a short string is not.
+  const name = m.name === undefined ? undefined : isStr(m.name) ? m.name : null;
   switch (m.t) {
     case 'hello':
       return Number.isInteger(m.version) ? { t: 'hello', version: m.version as number } : null;
     case 'create':
-      return m.side === 'w' || m.side === 'b' || m.side === 'random' ? { t: 'create', side: m.side } : null;
+      if (name === null) return null;
+      return m.side === 'w' || m.side === 'b' || m.side === 'random' ? { t: 'create', side: m.side, name } : null;
     case 'join':
-      return isStr(m.code) ? { t: 'join', code: m.code } : null;
+      if (name === null) return null;
+      return isStr(m.code) ? { t: 'join', code: m.code, name } : null;
     case 'resume':
       return isStr(m.code) && isStr(m.token, 128) ? { t: 'resume', code: m.code, token: m.token } : null;
     case 'move':
