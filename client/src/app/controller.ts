@@ -64,7 +64,16 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    this.board.setPosition(this.game.pieces());
+    // The intro cinematic opens the app the first time (or always, with ?intro=1), before the menu.
+    if (shouldPlayIntro()) {
+      this.setView('w', false);
+      this.hud.setCinematic(true);
+      await this.board.playIntro(this.game.pieces());
+      this.hud.setCinematic(false);
+      markIntroSeen();
+    } else {
+      this.board.setPosition(this.game.pieces());
+    }
     await this.openMenu();
   }
 
@@ -398,5 +407,24 @@ export class Controller {
   private setView(color: Color, animate: boolean): void {
     this.viewSide = color;
     this.board.setViewSide(color, animate);
+  }
+}
+
+const INTRO_SEEN_KEY = 'battlecore.intro.seen';
+
+function shouldPlayIntro(): boolean {
+  if (new URLSearchParams(location.search).has('intro')) return true;
+  try {
+    return localStorage.getItem(INTRO_SEEN_KEY) === null;
+  } catch {
+    return false;
+  }
+}
+
+function markIntroSeen(): void {
+  try {
+    localStorage.setItem(INTRO_SEEN_KEY, '1');
+  } catch {
+    /* storage unavailable: the intro just plays again next time */
   }
 }

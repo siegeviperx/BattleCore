@@ -16,4 +16,6 @@ export interface BoardView {
   setViewSide(color: Color, animate: boolean): void;
   /** Fired when the user clicks/taps a board square or a piece standing on it. */
   onSquareClick(cb: (square: Square) => void): void;
+  /** Play the intro cinematic, ending with `pieces` on the board. Any key or tap skips it. */
+  playIntro(pieces: BoardPiece[]): Promise<void>;
 }

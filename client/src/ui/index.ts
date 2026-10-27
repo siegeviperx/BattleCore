@@ -371,9 +371,16 @@ export function createHud(root: HTMLElement): Hud {
     movesBox.scrollTop = movesBox.scrollHeight;
   }
 
-  /** HUD is hidden while the menu or the lobby is up. */
+  let cinematic = false;
+
+  /** HUD is hidden while the menu, the lobby or a cutscene is up. */
   function syncHudHidden(): void {
-    setHudHidden(menuEl !== null || lobbyClose !== null);
+    setHudHidden(menuEl !== null || lobbyClose !== null || cinematic);
+  }
+
+  function setCinematic(on: boolean): void {
+    cinematic = on;
+    syncHudHidden();
   }
 
   function setHudHidden(hidden: boolean): void {
@@ -1121,6 +1128,7 @@ export function createHud(root: HTMLElement): Hud {
     onUndo: (cb) => void undoCbs.push(cb),
     onFlip: (cb) => void flipCbs.push(cb),
     onMenu: (cb) => void menuCbs.push(cb),
+    setCinematic,
     showLobby,
     setOnlineMode,
     setOpponentStatus,

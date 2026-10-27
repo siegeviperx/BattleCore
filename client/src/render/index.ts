@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BoardPiece, Color, FightMode, MoveAnim, MoveTarget, Square } from '../core/types';
+import { IntroDirector } from '../cutscene/intro';
 import { FightDirector } from '../fight/director';
 import type { BoardView } from './types';
 import { createScene } from './scene';
@@ -29,6 +30,8 @@ class ThreeBoardView implements BoardView {
   private boardPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BOARD_Y);
   private down: { x: number; y: number; id: number } | null = null;
   private fights: FightDirector;
+  private intro: IntroDirector;
+  private introPlaying = false;
   private vignette: HTMLDivElement;
   private start = performance.now();
 
@@ -70,6 +73,7 @@ class ThreeBoardView implements BoardView {
       setDim: (a) => (this.vignette.style.opacity = String(a)),
     });
     this.pieces.setFightHandler((m, mover, victim) => this.fights.play(m, mover, victim));
+    this.intro = new IntroDirector(scene, this.pieces, this.rig, this.pieceTw);
 
     this.resize();
     new ResizeObserver(() => this.resize()).observe(container);
@@ -129,6 +133,7 @@ class ThreeBoardView implements BoardView {
   }
 
   private pick(clientX: number, clientY: number): Square | null {
+    if (this.introPlaying) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.rig.camera);
@@ -176,6 +181,47 @@ class ThreeBoardView implements BoardView {
 
   onSquareClick(cb: (square: Square) => void): void {
     this.clickCbs.push(cb);
+  }
+
+  async playIntro(pieces: BoardPiece[]): Promise<void> {
+    this.fights.abort();
+    this.introPlaying = true;
+    const hint = document.createElement('div');
+    hint.textContent = 'Tap or press any key to skip';
+    Object.assign(hint.style, {
+      position: 'absolute',
+      left: '50%',
+      bottom: '18px',
+      transform: 'translateX(-50%)',
+      padding: '6px 14px',
+      borderRadius: '999px',
+      background: 'rgba(12, 8, 6, 0.55)',
+      color: '#f4ead2',
+      font: '600 13px system-ui, sans-serif',
+      letterSpacing: '0.04em',
+      pointerEvents: 'none',
+    });
+    this.container.appendChild(hint);
+    let stop: () => void = () => {};
+    const skip = new Promise<void>((resolve) => {
+      const onInput = (e: Event): void => {
+        e.preventDefault();
+        resolve();
+      };
+      window.addEventListener('keydown', onInput, true);
+      window.addEventListener('pointerdown', onInput, true);
+      stop = () => {
+        window.removeEventListener('keydown', onInput, true);
+        window.removeEventListener('pointerdown', onInput, true);
+      };
+    });
+    try {
+      await this.intro.play(pieces, skip);
+    } finally {
+      stop();
+      hint.remove();
+      this.introPlaying = false;
+    }
   }
 }
 

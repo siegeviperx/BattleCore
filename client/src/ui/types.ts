@@ -44,6 +44,8 @@ export interface Hud {
   onUndo(cb: () => void): void;
   onFlip(cb: () => void): void;
   onMenu(cb: () => void): void;
+  /** Hide the HUD for a cutscene. */
+  setCinematic(on: boolean): void;
 
   // --- Online play ---
   /** Overlay shown while connecting / waiting for an opponent. `code` is null while still connecting. */

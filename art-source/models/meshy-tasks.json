@@ -75,5 +75,15 @@
     "w-r": "01a17e22-ef91-72a6-a187-78fb3308aaa1",
     "w-q": "01a17e22-f2c2-775f-8787-62485d8bbb1e",
     "w-k": "01a17e22-f6f3-7497-9fe2-29a77cf03c4f"
+  },
+  "intro_images": {
+    "giant-baby": "01a17e2b-4baf-77eb-9caf-b500bc7c67b6",
+    "baby-dino": "01a17e2b-5358-7398-934b-d7d44840ab7e",
+    "baby-dino-noshirt": "01a17e2c-12f7-73a2-91d6-e085ca5ceadc"
+  },
+  "intro_models": {
+    "giant-baby": "01a17e33-7214-7452-8ebe-2152bfc1dd26",
+    "baby-dino": "01a17e33-757e-77d9-b36a-5699f93feb54",
+    "baby-dino-noshirt": "01a17e33-7815-733b-be65-2a8d56192d1d"
   }
 }
