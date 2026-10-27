@@ -8,6 +8,7 @@ import { BOARD_Y, squareToXZ } from '../render/coords';
 import { BASE_H, type PieceLayer, type PieceObj } from '../render/pieces';
 import { ease, type Tweener } from '../render/tween';
 import { createFighter, type Fighter } from './fighters';
+import { preloadFighterModels } from './models';
 import { blast, burst } from './fx';
 import { ATTACKS, KNOCKOUTS, type AttackSpec, type KnockoutSpec, type MoveCtx } from './moves';
 
@@ -45,7 +46,9 @@ export class FightDirector {
     private rig: CameraRig,
     private tw: Tweener,
     private dimmer: Dimmer,
-  ) {}
+  ) {
+    preloadFighterModels();
+  }
 
   /** Stop any fight at once (new position, undo, menu) and give the camera back. */
   abort(): void {

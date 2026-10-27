@@ -1,8 +1,9 @@
-// 3D fighters for capture scenes. For now these are procedural toy placeholders; rigged Meshy GLBs replace them
-// later behind the same Fighter shape (root/body/muzzle/flash), so the moves and director don't change.
+// 3D fighters for capture scenes: Meshy GLB models when loaded, procedural toy placeholders otherwise. Both sit
+// behind the same Fighter shape (root/body/muzzle/flash), so the moves and director don't change.
 import * as THREE from 'three';
 import type { Color, PieceType } from '../core/types';
 import data from '../data/pieces.json';
+import { cloneFighterModel, modelTuning, type ModelTuning } from './models';
 
 export interface Fighter {
   /** Placed and turned by the director; local +Z faces the opponent. */
@@ -83,7 +84,44 @@ export function createFighter(color: Color, type: PieceType): Fighter {
   const f = new ToyFighter(new Kit());
   if (color === 'w') buildBaby(f, type);
   else buildDino(f, type);
+  const model = cloneFighterModel(color, type);
+  if (model) swapInModel(f, model, modelTuning(color, type));
   return f;
+}
+
+/** Replace the toy's meshes with a Meshy model, keeping its height, muzzle spot and flier setting. */
+function swapInModel(f: ToyFighter, model: THREE.Object3D, tune: ModelTuning): void {
+  f.root.updateWorldMatrix(true, true);
+  const muzzle = f.body.worldToLocal(f.muzzle.getWorldPosition(new THREE.Vector3()));
+  f.body.clear();
+  f.dispose();
+  f.kit.geos.length = 0;
+  f.kit.mats.length = 0;
+
+  const height = f.height * tune.scale;
+  // Turn, then put the feet at the origin and the middle over it, then scale to the toy's height.
+  const pivot = new THREE.Group();
+  pivot.add(model);
+  model.rotation.y = tune.yaw;
+  pivot.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.set(-center.x, -box.min.y, -center.z);
+  pivot.scale.setScalar(height / Math.max(box.max.y - box.min.y, 1e-6));
+  f.body.add(pivot);
+
+  if (tune.muzzle) f.muzzle.position.set(...tune.muzzle).multiplyScalar(height);
+  else f.muzzle.position.copy(muzzle).multiplyScalar(tune.scale);
+  f.body.add(f.muzzle);
+  f.height = height;
+
+  // Flash and dispose work on the kit; the model's geometry stays shared with the cache.
+  model.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (m instanceof THREE.MeshStandardMaterial) f.kit.mats.push(m);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
