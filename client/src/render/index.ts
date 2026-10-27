@@ -93,6 +93,7 @@ class ThreeBoardView implements BoardView {
     const t = (performance.now() - this.start) / 1000;
     this.camTw.update(t);
     this.pieceTw.update(t);
+    this.fights.update(t);
     this.rig.update();
     // Keep the far table fading into the sunset haze at any zoom/aspect.
     const fog = this.scene.fog as THREE.Fog;

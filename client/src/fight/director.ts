@@ -36,6 +36,8 @@ export function knockoutSpec(color: 'w' | 'b', type: keyof typeof choreo.pieces.
 export class FightDirector {
   private stage: THREE.Group | null = null;
   private fighters: Fighter[] = [];
+  private lastTick: number | null = null;
+  private speed = 1;
   /** Bumped on abort so a running fight stops touching the scene. */
   private token = 0;
   mode: FightMode = 'full';
@@ -48,6 +50,13 @@ export class FightDirector {
     private dimmer: Dimmer,
   ) {
     preloadFighterModels();
+  }
+
+  /** Advance the fighters' rigged clips; called every frame with the render clock (seconds). */
+  update(now: number): void {
+    const dt = this.lastTick === null ? 0 : Math.min(0.1, now - this.lastTick);
+    this.lastTick = now;
+    for (const f of this.fighters) f.tick(dt);
   }
 
   /** Stop any fight at once (new position, undo, menu) and give the camera back. */
@@ -72,6 +81,7 @@ export class FightDirector {
     const alive = () => token === this.token && gen === this.layer.generation;
     const quick = this.mode === 'quick';
     const speed = quick ? timing.quickSpeed : 1;
+    this.speed = speed;
     const T = (s: number) => s / speed;
     const cam = quick ? choreo.camera.quick : choreo.camera.full;
     const tw = this.tw;
@@ -215,6 +225,7 @@ export class FightDirector {
     f.root.scale.setScalar(0.001);
     this.stage!.add(f.root);
     this.fighters.push(f);
+    f.play('idle', this.speed);
     return f;
   }
 
@@ -230,6 +241,7 @@ export class FightDirector {
     if (!alive()) return;
     const d = c.defender;
     d.setFlash(heavy ? 1 : 0.6);
+    if (heavy) d.play('hit', this.speed);
     if (heavy) {
       c.shake(timing.shake, T(0.25));
       await this.tw.wait(T(timing.hitStop));

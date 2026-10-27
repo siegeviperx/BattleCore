@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import type { Color, PieceType } from '../core/types';
 import data from '../data/pieces.json';
-import { cloneFighterModel, modelTuning, type ModelTuning } from './models';
+import { cloneFighterModel, modelTuning, type ClipName, type FighterModel, type ModelTuning } from './models';
 
 export interface Fighter {
   /** Placed and turned by the director; local +Z faces the opponent. */
@@ -18,6 +18,10 @@ export interface Fighter {
   readonly flier: boolean;
   /** 0..1 white hit flash. */
   setFlash(amount: number): void;
+  /** Play a rigged clip at `speed` (no-op for unrigged fighters); one-shots fall back to idle. */
+  play(clip: ClipName, speed?: number): void;
+  /** Advance rigged clips by `dt` seconds. */
+  tick(dt: number): void;
   dispose(): void;
 }
 
@@ -68,13 +72,31 @@ class ToyFighter implements Fighter {
     this.root.add(this.body);
   }
 
+  mixer: THREE.AnimationMixer | null = null;
+  actions: Partial<Record<ClipName, THREE.AnimationAction>> = {};
+  private current: THREE.AnimationAction | null = null;
+
   setFlash(amount: number): void {
     for (const m of this.kit.mats) {
       m.emissive.setRGB(amount, amount, amount);
     }
   }
 
+  play(clip: ClipName, speed = 1): void {
+    const next = this.actions[clip];
+    if (!this.mixer || !next) return;
+    this.mixer.timeScale = speed;
+    next.reset().play();
+    if (this.current && this.current !== next) next.crossFadeFrom(this.current, 0.15, false);
+    this.current = next;
+  }
+
+  tick(dt: number): void {
+    this.mixer?.update(dt);
+  }
+
   dispose(): void {
+    this.mixer?.stopAllAction();
     for (const g of this.kit.geos) g.dispose();
     for (const m of this.kit.mats) m.dispose();
   }
@@ -90,13 +112,20 @@ export function createFighter(color: Color, type: PieceType): Fighter {
 }
 
 /** Replace the toy's meshes with a Meshy model, keeping its height, muzzle spot and flier setting. */
-function swapInModel(f: ToyFighter, model: THREE.Object3D, tune: ModelTuning): void {
+function swapInModel(f: ToyFighter, { object: model, clips }: FighterModel, tune: ModelTuning): void {
   f.root.updateWorldMatrix(true, true);
   const muzzle = f.body.worldToLocal(f.muzzle.getWorldPosition(new THREE.Vector3()));
+  // A rigged model keeps the toy's weapon (with the muzzle on it) and carries it in its hand.
+  const weapon = tune.hand ? f.body.getObjectByName('weapon') : undefined;
+  const keep = new Set<THREE.BufferGeometry | THREE.Material>();
+  weapon?.traverse((o) => {
+    if (o instanceof THREE.Mesh) keep.add(o.geometry).add(o.material as THREE.Material);
+  });
   f.body.clear();
-  f.dispose();
-  f.kit.geos.length = 0;
-  f.kit.mats.length = 0;
+  for (const g of f.kit.geos) if (!keep.has(g)) g.dispose();
+  for (const m of f.kit.mats) if (!keep.has(m)) m.dispose();
+  f.kit.geos.splice(0, f.kit.geos.length, ...f.kit.geos.filter((g) => keep.has(g)));
+  f.kit.mats.splice(0, f.kit.mats.length, ...f.kit.mats.filter((m) => keep.has(m)));
 
   const height = f.height * tune.scale;
   // Turn, then put the feet at the origin and the middle over it, then scale to the toy's height.
@@ -110,10 +139,22 @@ function swapInModel(f: ToyFighter, model: THREE.Object3D, tune: ModelTuning): v
   pivot.scale.setScalar(height / Math.max(box.max.y - box.min.y, 1e-6));
   f.body.add(pivot);
 
-  if (tune.muzzle) f.muzzle.position.set(...tune.muzzle).multiplyScalar(height);
-  else f.muzzle.position.copy(muzzle).multiplyScalar(tune.scale);
-  f.body.add(f.muzzle);
+  const hand = tune.hand ? model.getObjectByName(tune.hand) : undefined;
+  if (weapon && hand) {
+    // Put the weapon at the hand in the bind pose, pointing forward, then let the bone carry it.
+    f.root.updateWorldMatrix(true, true);
+    weapon.position.copy(f.body.worldToLocal(hand.getWorldPosition(new THREE.Vector3())));
+    weapon.rotation.set(0, 0, 0);
+    weapon.scale.setScalar(tune.scale);
+    f.body.add(weapon);
+    hand.attach(weapon);
+  } else {
+    if (tune.muzzle) f.muzzle.position.set(...tune.muzzle).multiplyScalar(height);
+    else f.muzzle.position.copy(muzzle).multiplyScalar(tune.scale);
+    f.body.add(f.muzzle);
+  }
   f.height = height;
+  if (tune.flier !== undefined) f.flier = tune.flier;
 
   // Flash and dispose work on the kit; the model's geometry stays shared with the cache.
   model.traverse((o) => {
@@ -122,6 +163,19 @@ function swapInModel(f: ToyFighter, model: THREE.Object3D, tune: ModelTuning): v
       if (m instanceof THREE.MeshStandardMaterial) f.kit.mats.push(m);
     }
   });
+
+  if (!clips.idle) return;
+  const mixer = new THREE.AnimationMixer(model);
+  f.mixer = mixer;
+  for (const [name, clip] of Object.entries(clips) as [ClipName, THREE.AnimationClip][]) {
+    const action = mixer.clipAction(clip);
+    if (name !== 'idle') {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }
+    f.actions[name] = action;
+  }
+  mixer.addEventListener('finished', () => f.play('idle', mixer.timeScale));
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +265,7 @@ function buildBaby(f: ToyFighter, type: PieceType): void {
 
   // Weapon in hands
   const w = new THREE.Group();
+  w.name = 'weapon';
   w.position.set(0, 0.4, 0.24);
   b.add(w);
   if (type === 'k') {
