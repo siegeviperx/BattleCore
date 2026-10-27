@@ -19,7 +19,8 @@
   },
   "pieces": {
     "w": {
-      "p": { "name": "Baby Rifleman", "icon": "👶", "art": "pieces/w-p.png" },
+      "p": { "name": "Baby Rifleman", "icon": "👶", "art": "pieces/w-p.png",
+        "looks": ["w-p", "w-p2", "w-p3", "w-p4"] },
       "n": { "name": "Jetpack Baby", "icon": "🚀", "art": "pieces/w-n.png" },
       "b": { "name": "Sniper Baby", "icon": "🎯", "art": "pieces/w-b.png" },
       "r": { "name": "Baby Watchtower", "icon": "🏰", "art": "pieces/w-r.png" },

@@ -218,7 +218,7 @@ export class FightDirector {
   }
 
   private spawn(piece: PieceObj, facing: THREE.Vector3): Fighter {
-    const f = createFighter(piece.color, piece.type);
+    const f = createFighter(piece.color, piece.type, piece.look);
     f.root.position.copy(piece.root.position);
     f.root.position.y = BOARD_Y + BASE_H - 0.02 + (f.flier ? HOVER : 0);
     f.root.rotation.y = Math.atan2(facing.x, facing.z);

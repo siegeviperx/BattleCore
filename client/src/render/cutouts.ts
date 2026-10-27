@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { lookCount, lookKey } from '../core/looks';
 import type { Color, PieceType } from '../core/types';
 import data from '../data/pieces.json';
 
@@ -25,11 +26,11 @@ export interface Cutout {
 
 const cache = new Map<string, Cutout>();
 
-export function getCutout(color: Color, type: PieceType): Cutout {
-  const key = color + type;
+export function getCutout(color: Color, type: PieceType, look = 0): Cutout {
+  const key = lookKey(color, type, look);
   let c = cache.get(key);
   if (!c) {
-    c = drawCutout(color, type);
+    c = drawCutout(color, type, look);
     cache.set(key, c);
   }
   return c;
@@ -63,7 +64,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function drawCutout(color: Color, type: PieceType): Cutout {
+function drawCutout(color: Color, type: PieceType, look: number): Cutout {
   const faction = data.factions[color];
   const piece = data.pieces[color][type];
   const glyph = data.glyphs[type];
@@ -170,7 +171,7 @@ function drawCutout(color: Color, type: PieceType): Cutout {
   const cutout: Cutout = { texture, ...buildMask(ctx, cv) };
 
   // Real sticker art replaces the placeholder once it has loaded.
-  const art = (piece as { art?: string }).art;
+  const art = lookCount(color, type) > 1 ? `pieces/${lookKey(color, type, look)}.png` : (piece as { art?: string }).art;
   if (art) {
     const img = new Image();
     img.onload = () => {

@@ -102,12 +102,12 @@ class ToyFighter implements Fighter {
   }
 }
 
-export function createFighter(color: Color, type: PieceType): Fighter {
+export function createFighter(color: Color, type: PieceType, look = 0): Fighter {
   const f = new ToyFighter(new Kit());
   if (color === 'w') buildBaby(f, type);
   else buildDino(f, type);
-  const model = cloneFighterModel(color, type);
-  if (model) swapInModel(f, model, modelTuning(color, type));
+  const model = cloneFighterModel(color, type, look);
+  if (model) swapInModel(f, model, modelTuning(color, type, look));
   return f;
 }
 

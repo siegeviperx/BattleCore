@@ -1,5 +1,6 @@
 // Authoritative game state. Wraps chess.js so the rest of the app never touches it directly.
 import { Chess, DEFAULT_POSITION, type Move, type Square as ChessSquare } from 'chess.js';
+import { lookCount } from './looks';
 import type { BoardPiece, Color, MoveAnim, MoveTarget, PieceType, Square } from './types';
 
 export type GameOutcome =
@@ -31,13 +32,35 @@ export class Game {
   }
 
   pieces(): BoardPiece[] {
+    const origin = this.pawnOrigins();
     const out: BoardPiece[] = [];
     for (const row of this.chess.board()) {
       for (const cell of row) {
-        if (cell) out.push({ square: cell.square, color: cell.color, type: cell.type });
+        if (!cell) continue;
+        const p: BoardPiece = { square: cell.square, color: cell.color, type: cell.type };
+        const n = lookCount(cell.color, cell.type);
+        if (n > 1) p.look = (origin.get(cell.square) ?? fileIndex(cell.square)) % n;
+        out.push(p);
       }
     }
     return out;
+  }
+
+  /** Starting file (0-7) of each pawn still on the board, keyed by its current square, so a pawn keeps its
+   *  look after capturing sideways. */
+  private pawnOrigins(): Map<Square, number> {
+    const at = new Map<Square, number>();
+    const start = new Chess(this.startFen);
+    for (const row of start.board()) {
+      for (const cell of row) if (cell?.type === 'p') at.set(cell.square, fileIndex(cell.square));
+    }
+    for (const m of this.chess.history({ verbose: true })) {
+      if (m.captured) at.delete(m.isEnPassant() ? m.to[0] + m.from[1] : m.to);
+      const f = at.get(m.from);
+      at.delete(m.from);
+      if (f !== undefined && !m.promotion) at.set(m.to, f);
+    }
+    return at;
   }
 
   pieceAt(square: Square): BoardPiece | null {
@@ -122,6 +145,10 @@ export class Game {
     if (c.isDrawByFiftyMoves()) return { over: true, reason: 'fifty-move' };
     return { over: false };
   }
+}
+
+function fileIndex(sq: Square): number {
+  return sq.charCodeAt(0) - 97;
 }
 
 function toAnim(m: Move): MoveAnim {

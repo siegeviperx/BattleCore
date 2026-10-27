@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { lookCount, lookKey } from '../core/looks';
 import type { Color, PieceType } from '../core/types';
 import tuning from '../data/fighter-models.json';
 
@@ -38,22 +39,26 @@ export function preloadFighterModels(): void {
   const loader = new GLTFLoader();
   for (const c of ['w', 'b'] as Color[]) {
     for (const t of TYPES) {
-      const key = c + t;
-      loader
-        .loadAsync(`${import.meta.env.BASE_URL}assets/fighters/${c}-${t}.glb`)
-        .then((gltf) => cache.set(key, gltf))
-        .catch(() => {}); // no model yet: the toy stands in
+      for (let look = 0; look < lookCount(c, t); look++) {
+        const key = lookKey(c, t, look);
+        loader
+          .loadAsync(`${import.meta.env.BASE_URL}assets/fighters/${key}.glb`)
+          .then((gltf) => cache.set(key, gltf))
+          .catch(() => {}); // no model yet: the toy stands in
+      }
     }
   }
 }
 
-export function modelTuning(color: Color, type: PieceType): ModelTuning {
-  return { yaw: 0, scale: 1, ...(tuning as Record<string, Partial<ModelTuning>>)[color + type] };
+/** Tuning is keyed like "wp" / "wp2" (the look key without its dash). */
+export function modelTuning(color: Color, type: PieceType, look = 0): ModelTuning {
+  const key = lookKey(color, type, look).replace('-', '');
+  return { yaw: 0, scale: 1, ...(tuning as Record<string, Partial<ModelTuning>>)[key] };
 }
 
 /** A fresh copy with its own materials (so hit flashes don't leak) and its clips, or null if not loaded. */
-export function cloneFighterModel(color: Color, type: PieceType): FighterModel | null {
-  const src = cache.get(color + type);
+export function cloneFighterModel(color: Color, type: PieceType, look = 0): FighterModel | null {
+  const src = cache.get(lookKey(color, type, look));
   if (!src) return null;
   const copy = cloneSkinned(src.scene);
   copy.traverse((o) => {

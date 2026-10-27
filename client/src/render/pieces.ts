@@ -43,6 +43,8 @@ export class PieceObj {
   private depthMat: THREE.MeshDepthMaterial;
   color: Color;
   type: PieceType;
+  /** Art variant; only meaningful while the piece keeps its type (a promoted pawn uses look 0). */
+  look: number;
   square: Square;
   moving = false;
   readonly phase = Math.random() * Math.PI * 2;
@@ -50,6 +52,7 @@ export class PieceObj {
   constructor(p: BoardPiece) {
     this.color = p.color;
     this.type = p.type;
+    this.look = p.look ?? 0;
     this.square = p.square;
     this.base = new THREE.Mesh(baseGeo, getBaseMaterials(p.color));
     this.base.castShadow = true;
@@ -58,7 +61,7 @@ export class PieceObj {
     this.base.rotation.y = p.color === 'w' ? Math.PI / 2 : -Math.PI / 2;
     const rim = new THREE.Mesh(rimGeo, rimMat);
     rim.position.y = 0.012;
-    const c = getCutout(p.color, p.type);
+    const c = getCutout(p.color, p.type, this.look);
     const mat = new THREE.MeshStandardMaterial({
       map: c.texture,
       emissive: '#ffffff',
@@ -93,6 +96,7 @@ export class PieceObj {
 
   setType(type: PieceType): void {
     this.type = type;
+    this.look = 0;
     const c = getCutout(this.color, type);
     this.cutout.material.map = c.texture;
     this.cutout.material.emissiveMap = c.texture;
@@ -111,7 +115,7 @@ export class PieceObj {
   /** Is the given raycast hit on an opaque part of this piece? */
   hitTest(hit: THREE.Intersection): boolean {
     if (hit.object === this.base) return true;
-    if (hit.object === this.cutout && hit.uv) return cutoutHit(getCutout(this.color, this.type), hit.uv.x, hit.uv.y);
+    if (hit.object === this.cutout && hit.uv) return cutoutHit(getCutout(this.color, this.type, this.look), hit.uv.x, hit.uv.y);
     return false;
   }
 

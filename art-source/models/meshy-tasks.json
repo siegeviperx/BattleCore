@@ -55,5 +55,25 @@
   },
   "tpose_animate_89_4_178": {
     "w-p": "01a17dc2-4cfd-7001-bad3-08c7ee2c0ed7"
+  },
+  "diverse_sticker_images": {
+    "w-p2 black girl": "01a17e17-06ca-7566-b2e9-9f092f7988e6",
+    "w-p3 indian boy": "01a17e17-093b-7289-a173-abb6176b9fae",
+    "w-p4 hispanic girl": "01a17e17-0bcf-70b4-a5b5-0459d0b08acd",
+    "w-n black boy": "01a17e17-0df2-7705-995f-2ddd9cb39eaa",
+    "w-b hispanic girl": "01a17e17-103e-7418-a03c-c6bd8ea91cee",
+    "w-r indian girl": "01a17e17-1282-74c9-bbdf-45029c2b3282",
+    "w-q black girl": "01a17e17-14c2-777b-9410-21ef8c820610",
+    "w-k hispanic boy": "01a17e17-16fa-7348-926e-9647ca3059b5"
+  },
+  "diverse_models": {
+    "w-p2": "01a17e22-d9f0-74a5-8e85-1123322b2f6d",
+    "w-p3": "01a17e22-de69-7222-9382-3637d7984d32",
+    "w-p4": "01a17e22-e38d-776e-9e5b-83b7cc8559aa",
+    "w-n": "01a17e22-e786-74a1-8a5a-c9ef408f74b5",
+    "w-b": "01a17e22-eb6d-7633-a290-654e564b374e",
+    "w-r": "01a17e22-ef91-72a6-a187-78fb3308aaa1",
+    "w-q": "01a17e22-f2c2-775f-8787-62485d8bbb1e",
+    "w-k": "01a17e22-f6f3-7497-9fe2-29a77cf03c4f"
   }
 }
