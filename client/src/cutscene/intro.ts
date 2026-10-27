@@ -256,6 +256,7 @@ export class IntroDirector {
     cut(v(0, 2.4, 1.2), v(0, 0.6, -3));
     void camTo(v(0, 2.8, 2.2), v(0, 0.6, -3), 6);
     sfx('rumble', { rate: 1.5 });
+    sfx('transform');
     await tween(1.2, (t) => {
       for (const { f } of dinoFigs) f.body.rotation.z = (Math.random() - 0.5) * 0.25 * t;
     }, ease.linear);
@@ -323,9 +324,9 @@ export class IntroDirector {
     void tween(1.2, (t) => bare.position.set(dSpot.x - 8 * t, BOARD_Y, dSpot.z + 2 * t), ease.inCubic).then(() => stage.remove(bare));
     const offsets = babyFigs.map(() => Math.random() * Math.PI * 2);
     later(0.3, 'giggle');
-    later(1.4, 'giggle', { rate: 1.15 });
-    later(2.5, 'giggle', { rate: 0.9 });
-    later(3.2, 'giggle', { rate: 1.05 });
+    later(1.1, 'babble');
+    later(2.3, 'giggle', { rate: 1.15 });
+    later(3.0, 'babble', { rate: 1.1 });
     await tween(4, (t) => {
       for (const [i, { f, home, yaw }] of babyFigs.entries()) {
         const ph = t * Math.PI * 6 + offsets[i];

@@ -163,7 +163,8 @@ export class FightDirector {
     const at = defender.body.getWorldPosition(new THREE.Vector3());
     at.y = Math.max(BOARD_Y, at.y - 0.2);
     const puff = burst(stage, tw, at, 1.2);
-    sfx(mover.color === 'w' ? 'giggle' : 'roar', { vol: 0.7, delay: T(0.15) });
+    const winVoices = mover.color === 'w' ? (['giggle', 'cheer'] as const) : (['roar', 'growl'] as const);
+    sfx(winVoices[Math.floor(Math.random() * 2)], { vol: 0.7, delay: T(0.15) });
     stage.remove(defender.root);
     this.layer.discard(victim);
     await tw.wait(T(0.3));

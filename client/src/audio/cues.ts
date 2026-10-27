@@ -89,6 +89,11 @@ export const CUES = {
   },
   /** Baby voice (placeholder: a run of blips until recorded giggles arrive). */
   giggle: { jitter: 0.12, layers: [0, 0.09, 0.18, 0.27, 0.36].map((t, i) => tone('triangle', [900 - i * 40, 1100 - i * 40], 0.06, { t, v: 0.22 - i * 0.03 })) },
+  babble: { jitter: 0.1, layers: [0, 0.14, 0.3, 0.42].map((t, i) => tone('triangle', [500 + i * 60, 650 - i * 30], 0.1, { t, v: 0.2 })) },
+  cheer: { layers: [tone('triangle', [700, 1100], 0.3, { v: 0.3 })] },
+  growl: { jitter: 0.08, layers: [tone('sawtooth', [90, 70], 0.6, { v: 0.35, a: 0.05, lp: 500 })] },
+  /** Toy dinos armoring up in the intro. */
+  transform: { layers: [...notes('sine', [784, 1047, 1319, 1568], 0.18, 0.3, 0.12), noise([3000], 0.05, { t: 0.9, filter: 'highpass', v: 0.5 })] },
   /** Baby battle cry ("Chaaarge!"). */
   cry: { layers: [tone('triangle', [600, 900], 0.2, { v: 0.3 }), tone('triangle', [900, 760], 0.45, { t: 0.18, v: 0.3 })] },
 
@@ -129,33 +134,51 @@ const kenney = (base: string, from: number, to: number, o: Omit<SoundFile, 'file
   files: Array.from({ length: to - from + 1 }, (_, i) => `assets/audio/kenney/${base}${from + i}.mp3`),
   ...o,
 });
-const kenneyNamed = (names: string[], o: Omit<SoundFile, 'files'> = {}): SoundFile => ({
-  files: names.map((n) => `assets/audio/kenney/${n}.mp3`),
+
+/** ElevenLabs takes from art-source/audio/ai (trimmed + peak-normalized into assets/audio/ai). */
+const ai = (names: string[], o: Omit<SoundFile, 'files'> = {}): SoundFile => ({
+  files: names.map((n) => `assets/audio/ai/${n}.mp3`),
   ...o,
 });
 
 /** Recorded sounds that replace a synth cue, by cue name. Cues not listed here use their synth recipe. */
 export const FILES: Partial<Record<CueName, SoundFile>> = {
+  // ElevenLabs (voices + cartoon toy effects)
+  giggle: ai(['giggle-1'], { vol: 0.8 }),
+  babble: ai(['babble-1'], { vol: 0.8 }),
+  cry: ai(['cry-1'], { vol: 0.8 }),
+  cheer: ai(['cheer-1'], { vol: 0.8 }),
+  roar: ai(['roar-1'], { maxDur: 1.6 }),
+  growl: ai(['growl-1']),
+  transform: ai(['transform'], { vol: 0.8 }),
+  check: ai(['stamp']),
+  flutter: ai(['paper-flutter'], { vol: 0.6 }),
+  clatter: ai(['toy-clatter'], { vol: 0.5 }),
+  stomp: ai(['giant-stomp']),
+  squeak: ai(['squeak-step'], { vol: 0.6 }),
+  snap: ai(['suit-up'], { vol: 0.8 }),
+  scratch: ai(['scratch'], { vol: 0.8 }),
+  'shot.dart': ai(['shot-dart'], { vol: 0.6 }),
+  'shot.bullet': ai(['shot-bullet'], { vol: 0.6 }),
+  'shot.ball': ai(['shot-ball'], { vol: 0.8 }),
+  'shot.boulder': ai(['shot-boulder'], { vol: 0.8 }),
+  'shot.missile': ai(['shot-missile'], { vol: 0.7 }),
+  'shot.bottle': ai(['shot-bottle'], { vol: 0.7 }),
+  boom: ai(['boom'], { vol: 0.9 }),
+  squish: ai(['squish'], { vol: 0.8 }),
+  whee: ai(['whee'], { vol: 0.6 }),
+  flame: ai(['flame'], { vol: 0.8, maxDur: 0.9 }),
+
+  // Kenney CC0
   click: kenney('click_00', 1, 5, { vol: 0.6 }),
   select: kenney('select_00', 1, 4, { vol: 0.7 }),
   notify: kenney('confirmation_00', 1, 1),
   undo: kenney('back_00', 1, 4),
-  flutter: kenney('bookFlip', 1, 3, { vol: 0.7 }),
   land: kenney('impactWood_light_00', 0, 4, { vol: 0.6 }),
   promote: kenney('maximize_00', 1, 1),
-  check: kenney('bookPlace', 1, 3, { rate: 0.85 }),
   pop: kenney('pluck_00', 1, 2),
-  'shot.dart': kenney('laserRetro_00', 0, 4, { vol: 0.5 }),
-  'shot.bullet': kenney('laserSmall_00', 0, 4, { vol: 0.5 }),
-  boom: kenney('explosionCrunch_00', 0, 4),
   'hit.light': kenney('impactPunch_medium_00', 0, 4),
   'hit.heavy': kenney('impactPunch_heavy_00', 0, 4),
-  flame: kenney('thrusterFire_00', 0, 4, { maxDur: 0.9 }),
   thud: kenney('impactSoft_heavy_00', 0, 4),
-  squish: kenney('slime_00', 0, 1),
-  snap: kenneyNamed(['metalClick', 'metalLatch', 'beltHandle1', 'beltHandle2']),
-  clatter: kenney('impactPlate_light_00', 0, 4, { rate: 1.3, vol: 0.6 }),
-  stomp: kenney('impactWood_heavy_00', 0, 4, { rate: 0.6 }),
-  scratch: kenney('scratch_00', 1, 5),
   sparkle: kenney('glass_00', 1, 6, { vol: 0.6 }),
 };
