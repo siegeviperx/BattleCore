@@ -21,8 +21,12 @@ export interface BoardView {
   setFightMode(mode: FightMode): void;
   /** Rotate the camera to view from this side. */
   setViewSide(color: Color, animate: boolean): void;
+  /** Mouse hovering over a square (null when it leaves the board or a drag starts), with client coordinates. */
+  onSquareHover(cb: (square: Square | null, x: number, y: number) => void): void;
   /** Fired when the user clicks/taps a board square or a piece standing on it. */
   onSquareClick(cb: (square: Square) => void): void;
+  /** Resolves once the intro's 3D models have downloaded (so it never shows stand-ins on a slow connection). */
+  introReady(): Promise<void>;
   /** Play the intro cinematic, ending with `pieces` on the board. Any key or tap skips it. */
   playIntro(pieces: BoardPiece[]): Promise<void>;
 }

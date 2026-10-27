@@ -31,23 +31,28 @@ export interface FighterModel {
 
 const TYPES: PieceType[] = ['p', 'n', 'b', 'r', 'q', 'k'];
 const cache = new Map<string, { scene: THREE.Object3D; animations: THREE.AnimationClip[] }>();
-let started = false;
+let loading: Promise<void> | null = null;
 
-export function preloadFighterModels(): void {
-  if (started) return;
-  started = true;
+/** Start downloading every fighter model; resolves once each one has loaded or failed. */
+export function preloadFighterModels(): Promise<void> {
+  if (loading) return loading;
   const loader = new GLTFLoader();
+  const jobs: Promise<void>[] = [];
   for (const c of ['w', 'b'] as Color[]) {
     for (const t of TYPES) {
       for (let look = 0; look < lookCount(c, t); look++) {
         const key = lookKey(c, t, look);
-        loader
-          .loadAsync(`${import.meta.env.BASE_URL}assets/fighters/${key}.glb`)
-          .then((gltf) => cache.set(key, gltf))
-          .catch(() => {}); // no model yet: the toy stands in
+        jobs.push(
+          loader
+            .loadAsync(`${import.meta.env.BASE_URL}assets/fighters/${key}.glb`)
+            .then((gltf) => void cache.set(key, gltf))
+            .catch(() => {}), // no model yet: the toy stands in
+        );
       }
     }
   }
+  loading = Promise.all(jobs).then(() => {});
+  return loading;
 }
 
 /** Tuning is keyed like "wp" / "wp2" (the look key without its dash). */

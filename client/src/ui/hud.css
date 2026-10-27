@@ -451,6 +451,47 @@
   color: #1b1208;
 }
 
+/* Piece name tag that follows the mouse over the board */
+.bc-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 12px 7px 10px;
+  pointer-events: none;
+  border-radius: 8px;
+  border: 1px solid var(--bc-steel-edge);
+  border-left: 4px solid var(--fac);
+  background: linear-gradient(180deg, rgba(42, 39, 35, 0.96), rgba(24, 22, 19, 0.96));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.bc-tip__name {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--facl);
+}
+
+.bc-tip__role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bc-ink-dim);
+}
+
+.bc-tip[data-owner='enemy'] .bc-tip__role {
+  color: #ff8a70;
+}
+
+.bc-tip[data-owner='yours'] .bc-tip__role {
+  color: #a8d68a;
+}
+
 /* Speaker / quick mute (top-left) */
 .bc-mute {
   position: absolute;
@@ -526,13 +567,13 @@
   opacity: 0.4;
 }
 
-/* Online toolbar: Resign / Offer draw on top, Flip / Menu below. */
-.bc-toolbar--online {
+/* Four tools (Undo or Offer draw, Forfeit, Flip, Menu): two rows of two. */
+.bc-toolbar--quad {
   grid-auto-flow: row;
   grid-template-columns: 1fr 1fr;
 }
 
-.bc-toolbar--online .bc-tool {
+.bc-toolbar--quad .bc-tool {
   flex-direction: row;
   gap: 6px;
   min-height: 42px;
@@ -545,7 +586,7 @@
   animation: bc-confirm 3s linear both;
 }
 
-.bc-toolbar--online .bc-tool--resign.is-confirm {
+.bc-toolbar--quad .bc-tool--resign.is-confirm {
   white-space: normal;
   line-height: 1.1;
   text-align: center;
@@ -1629,22 +1670,22 @@
     min-height: 44px;
   }
 
-  /* Online: four icon-only buttons in one row (labels stay for screen readers). */
-  .bc-toolbar--online {
+  /* Phones: four icon-only buttons in one row (labels stay for screen readers). */
+  .bc-toolbar--quad {
     grid-auto-flow: column;
     grid-template-columns: none;
   }
 
-  .bc-toolbar--online .bc-tool {
+  .bc-toolbar--quad .bc-tool {
     min-height: 44px;
   }
 
-  .bc-toolbar--online .bc-tool .bc-icon {
+  .bc-toolbar--quad .bc-tool .bc-icon {
     width: 20px;
     height: 20px;
   }
 
-  .bc-toolbar--online .bc-tool__label {
+  .bc-toolbar--quad .bc-tool__label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1654,11 +1695,11 @@
   }
 
   /* Confirming a resign: grow to show the question in words. */
-  .bc-toolbar--online .bc-tool--resign.is-confirm {
+  .bc-toolbar--quad .bc-tool--resign.is-confirm {
     grid-column: span 2;
   }
 
-  .bc-toolbar--online .bc-tool--resign.is-confirm .bc-tool__label {
+  .bc-toolbar--quad .bc-tool--resign.is-confirm .bc-tool__label {
     position: static;
     width: auto;
     height: auto;
@@ -1793,6 +1834,27 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   animation: bc-start-pulse 1.6s ease-in-out infinite;
+}
+
+.bc-start__prompt.is-loading {
+  border-color: transparent;
+  color: var(--bc-ink-dim);
+  animation: none;
+}
+
+.bc-start__prompt.is-loading::after {
+  content: '';
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: bc-start-dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes bc-start-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
 }
 
 @keyframes bc-start-pulse {

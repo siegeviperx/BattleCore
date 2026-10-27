@@ -9,12 +9,14 @@ import { OnlineClient, type ConnectionState } from '../net/client';
 import type { BoardView } from '../render/types';
 import type { Hud, IntroMode, MenuChoice, OnlineRequest } from '../ui/types';
 
+/** The start card waits this long at most for the intro's models before letting the player in anyway. */
+const INTRO_LOAD_TIMEOUT_MS = 30_000;
 /** Minimum time the AI appears to think, so its replies don't feel instant. */
 const MIN_AI_DELAY_MS = 450;
 
 const RESULT_TEXT: Record<GameOverReason, string> = {
   checkmate: 'by checkmate.',
-  resign: 'by resignation.',
+  resign: 'by forfeit.',
   abandon: 'Their opponent abandoned the battlefield.',
   stalemate: 'Stalemate: nobody can move.',
   repetition: 'Draw by threefold repetition.',
@@ -40,6 +42,8 @@ export class Controller {
   private selected: Square | null = null;
   private targets: MoveTarget[] = [];
   private animating = false;
+  /** Offline: the player gave up; the game is over even though the position isn't. */
+  private forfeited = false;
   private inMenu = false;
   private aiToken = 0;
   private viewSide: Color = 'w';
@@ -53,10 +57,11 @@ export class Controller {
     private engine: Engine,
   ) {
     board.onSquareClick((sq) => this.onSquareClick(sq));
+    board.onSquareHover((sq, x, y) => this.onSquareHover(sq, x, y));
     hud.onUndo(() => this.undo());
     hud.onFlip(() => this.setView(other(this.viewSide), true));
     hud.onMenu(() => void this.openMenu());
-    hud.onResign(() => this.online?.net.send({ t: 'resign' }));
+    hud.onResign(() => this.forfeit());
     hud.onOfferDraw(() => {
       if (!this.online?.started || this.online.over) return;
       this.online.net.send({ t: 'offerDraw' });
@@ -68,7 +73,8 @@ export class Controller {
     // The intro cinematic opens the app (per the menu's intro setting, or ?intro=1 / ?intro=0), before the menu.
     if (shouldPlayIntro(this.hud.introMode())) {
       // Browsers only start audio after a tap or key press, so the intro waits behind a title card.
-      await this.hud.showStart();
+      const loaded = Promise.race([this.board.introReady(), new Promise<void>((r) => setTimeout(r, INTRO_LOAD_TIMEOUT_MS))]);
+      await this.hud.showStart(loaded);
       this.setView('w', false);
       this.hud.setCinematic(true);
       audio.music('intro');
@@ -96,6 +102,7 @@ export class Controller {
 
   private newGame(fen?: string): void {
     this.stopAi();
+    this.forfeited = false;
     this.game = new Game(fen);
     this.clearSelection();
     this.board.setPosition(this.game.pieces());
@@ -115,9 +122,36 @@ export class Controller {
   }
 
   private isHumanTurn(): boolean {
+    if (this.forfeited) return false;
     if (this.choice.mode === 'online' && (!this.online?.started || this.online.over)) return false;
     const side = this.humanSide();
     return side === null || this.game.turn === side;
+  }
+
+  private onSquareHover(square: Square | null, x: number, y: number): void {
+    const piece = square && !this.inMenu ? this.game.pieceAt(square) : null;
+    if (!piece) {
+      this.hud.showPieceTip(null);
+      return;
+    }
+    const me = this.humanSide();
+    const owner = me === null ? null : piece.color === me ? 'yours' : 'enemy';
+    this.hud.showPieceTip({ color: piece.color, type: piece.type, owner }, x, y);
+  }
+
+  /** Forfeit button (confirmed in the HUD). Online the server decides the result; offline it ends the game here. */
+  private forfeit(): void {
+    if (this.online) {
+      this.online.net.send({ t: 'resign' });
+      return;
+    }
+    if (this.inMenu || this.forfeited || this.game.outcome().over) return;
+    this.forfeited = true;
+    this.stopAi();
+    this.clearSelection();
+    this.hud.setUndoEnabled(false);
+    const loser = this.humanSide() ?? this.game.turn;
+    void this.animQueue.then(() => this.showResult({ winner: other(loser), reason: 'resign' }));
   }
 
   private onSquareClick(square: Square): void {
@@ -186,6 +220,7 @@ export class Controller {
   }
 
   private async maybeAiMove(): Promise<void> {
+    if (this.forfeited) return;
     if (this.choice.mode !== 'ai' || this.isHumanTurn() || this.game.outcome().over) return;
     const token = ++this.aiToken;
     this.hud.setThinking(true);
@@ -219,7 +254,7 @@ export class Controller {
   }
 
   private undo(): void {
-    if (this.animating || this.online || this.game.ply === 0) return;
+    if (this.animating || this.online || this.forfeited || this.game.ply === 0) return;
     this.stopAi();
     sfx('undo');
     if (this.choice.mode === 'ai') {

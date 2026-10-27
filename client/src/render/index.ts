@@ -16,6 +16,8 @@ export type { Insets } from './camera';
 
 /** Pointer travel (px) above which a press counts as an orbit drag, not a click. */
 const CLICK_SLOP = 6;
+/** Touch: holding a piece this long (ms) shows its name tag instead of tapping it. */
+const HOLD_MS = 450;
 
 class ThreeBoardView implements BoardView {
   private renderer: THREE.WebGLRenderer;
@@ -26,10 +28,15 @@ class ThreeBoardView implements BoardView {
   private pieceTw = new Tweener();
   private camTw = new Tweener();
   private clickCbs: ((sq: Square) => void)[] = [];
+  private hoverCbs: ((sq: Square | null, x: number, y: number) => void)[] = [];
+  private hovered: Square | null = null;
   private raycaster = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
   private boardPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BOARD_Y);
   private down: { x: number; y: number; id: number } | null = null;
+  /** Touch press-and-hold timer, and whether the current press turned into a hold. */
+  private holdTimer = 0;
+  private held = false;
   private fights: FightDirector;
   private intro: IntroDirector;
   private introPlaying = false;
@@ -116,21 +123,61 @@ class ThreeBoardView implements BoardView {
     el.addEventListener('pointerdown', (e) => {
       if (!e.isPrimary) return;
       this.down = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      this.held = false;
+      window.clearTimeout(this.holdTimer);
+      if (e.pointerType !== 'mouse') {
+        const { clientX: x, clientY: y } = e;
+        this.holdTimer = window.setTimeout(() => {
+          if (!this.down) return;
+          this.held = true;
+          this.hover(this.pick(x, y), x, y);
+        }, HOLD_MS);
+      }
     });
     el.addEventListener('pointerup', (e) => {
       const d = this.down;
       this.down = null;
+      window.clearTimeout(this.holdTimer);
+      if (this.held) {
+        this.held = false;
+        this.hover(null, 0, 0);
+        return;
+      }
       if (!d || d.id !== e.pointerId) return;
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_SLOP) return;
       const sq = this.pick(e.clientX, e.clientY);
       if (sq) for (const cb of this.clickCbs) cb(sq);
     });
-    el.addEventListener('pointercancel', () => (this.down = null));
-    el.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      if (this.down && e.buttons) return; // dragging the camera
-      el.style.cursor = this.pick(e.clientX, e.clientY) ? 'pointer' : '';
+    el.addEventListener('pointercancel', () => {
+      this.down = null;
+      this.held = false;
+      window.clearTimeout(this.holdTimer);
+      this.hover(null, 0, 0);
     });
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') {
+        // A finger that starts dragging (orbiting the camera) is not a hold.
+        const d = this.down;
+        if (d && !this.held && Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_SLOP) window.clearTimeout(this.holdTimer);
+        return;
+      }
+      if (this.down && e.buttons) {
+        this.hover(null, 0, 0); // dragging the camera
+        return;
+      }
+      const sq = this.pick(e.clientX, e.clientY);
+      el.style.cursor = sq ? 'pointer' : '';
+      this.hover(sq, e.clientX, e.clientY);
+    });
+    el.addEventListener('pointerleave', () => this.hover(null, 0, 0));
+    // Press-and-hold shows the piece tag, so keep the browser's long-press menu off the board.
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  private hover(sq: Square | null, x: number, y: number): void {
+    if (sq === null && this.hovered === null) return;
+    this.hovered = sq;
+    for (const cb of this.hoverCbs) cb(sq, x, y);
   }
 
   private pick(clientX: number, clientY: number): Square | null {
@@ -236,8 +283,16 @@ class ThreeBoardView implements BoardView {
     this.rig.setViewSide(color, animate);
   }
 
+  onSquareHover(cb: (square: Square | null, x: number, y: number) => void): void {
+    this.hoverCbs.push(cb);
+  }
+
   onSquareClick(cb: (square: Square) => void): void {
     this.clickCbs.push(cb);
+  }
+
+  introReady(): Promise<void> {
+    return this.intro.ready();
   }
 
   async playIntro(pieces: BoardPiece[]): Promise<void> {

@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { audio, sfx, type CueName } from '../audio';
 import type { BoardPiece, PieceType } from '../core/types';
 import { createFighter, type Fighter } from '../fight/fighters';
+import { preloadFighterModels } from '../fight/models';
 import { blast, burst } from '../fight/fx';
 import type { CameraRig, Shot } from '../render/camera';
 import { BOARD_Y, squareToXZ } from '../render/coords';
@@ -27,18 +28,21 @@ const TOY_COLORS: Record<PieceType, string> = { p: '#36b24f', n: '#e8453c', b: '
 const CHARACTERS = ['giant-baby', 'baby-dino', 'baby-dino-noshirt'] as const;
 type CharKey = (typeof CHARACTERS)[number];
 const charCache = new Map<CharKey, THREE.Object3D>();
-let preloaded = false;
+let loading: Promise<void> | null = null;
 
-export function preloadIntro(): void {
-  if (preloaded) return;
-  preloaded = true;
+/** Start downloading the intro characters; resolves once each one has loaded or failed. */
+export function preloadIntro(): Promise<void> {
+  if (loading) return loading;
   const loader = new GLTFLoader();
-  for (const key of CHARACTERS) {
-    loader
-      .loadAsync(`${import.meta.env.BASE_URL}assets/intro/${key}.glb`)
-      .then((gltf) => charCache.set(key, gltf.scene))
-      .catch(() => {}); // missing model: a plain stand-in keeps the timeline running
-  }
+  loading = Promise.all(
+    CHARACTERS.map((key) =>
+      loader
+        .loadAsync(`${import.meta.env.BASE_URL}assets/intro/${key}.glb`)
+        .then((gltf) => void charCache.set(key, gltf.scene))
+        .catch(() => {}), // missing model: a plain stand-in keeps the timeline running
+    ),
+  ).then(() => {});
+  return loading;
 }
 
 /** A character `height` tall, feet at the origin, facing local +Z. */
@@ -107,6 +111,11 @@ export class IntroDirector {
     private tw: Tweener,
   ) {
     preloadIntro();
+  }
+
+  /** Resolves when every model the intro shows (characters and board fighters) has downloaded. */
+  ready(): Promise<void> {
+    return Promise.all([preloadIntro(), preloadFighterModels()]).then(() => {});
   }
 
   /** Play the intro, ending with `pieces` as paper cutouts. Resolves when it finishes or `skip` resolves. */

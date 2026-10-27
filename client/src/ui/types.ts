@@ -30,6 +30,14 @@ export interface ScreenInsets {
   left: number;
 }
 
+/** What the hover tag says about a piece under the mouse. */
+export interface PieceTip {
+  color: Color;
+  type: PieceType;
+  /** Whose piece it is from this player's point of view (null in local 2-player). */
+  owner: 'yours' | 'enemy' | null;
+}
+
 export type OpponentStatus = 'waiting' | 'connected' | 'disconnected' | 'left';
 
 export interface Lobby {
@@ -57,20 +65,23 @@ export interface Hud {
   onMenu(cb: () => void): void;
   /** Hide the HUD for a cutscene. */
   setCinematic(on: boolean): void;
+  /** Show the name tag for the piece under the mouse at client (x, y), or hide it with null. */
+  showPieceTip(tip: PieceTip | null, x?: number, y?: number): void;
   /** Fires when the screen area covered by the HUD changes (resize, panel layout, HUD hidden for a cutscene). */
   onInsetsChange(cb: (insets: ScreenInsets) => void): void;
-  /** Title card that waits for a tap or key press, which also lets the browser start audio. */
-  showStart(): Promise<void>;
+  /** Title card: shows "Loading" until `ready` settles, then waits for a tap or key press (which also lets the browser start audio). */
+  showStart(ready: Promise<void>): Promise<void>;
   /** The saved intro preference (read before the menu opens). */
   introMode(): IntroMode;
 
   // --- Online play ---
   /** Overlay shown while connecting / waiting for an opponent. `code` is null while still connecting. */
   showLobby(code: string | null, side: Color | null): Lobby;
-  /** Online games: swap Undo for Resign + Offer Draw, show the opponent status chip. False restores offline controls. */
+  /** Online games: swap Undo for Offer Draw, show the opponent status chip. False restores offline controls. */
   setOnlineMode(online: boolean): void;
   /** `name` replaces the faction label on the chip when the opponent gave one. */
   setOpponentStatus(status: OpponentStatus, side: Color, name?: string | null): void;
+  /** Forfeit confirmed (every mode). */
   onResign(cb: () => void): void;
   onOfferDraw(cb: () => void): void;
   /** Ask whether to accept the opponent's draw offer. */

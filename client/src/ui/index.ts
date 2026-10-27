@@ -3,9 +3,9 @@ import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import { audio, type SoundMode } from '../audio';
 import data from '../data/pieces.json';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
-import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, ScreenInsets } from './types';
+import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
 
-export type { Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus, ScreenInsets } from './types';
+export type { Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -44,6 +44,7 @@ const SOUND_MODES: { id: SoundMode; label: string; hint: string }[] = [
   { id: 'sfx', label: 'Effects', hint: 'No music' },
   { id: 'off', label: 'Off', hint: 'Silence' },
 ];
+const ROLE_NAMES: Record<PieceType, string> = { p: 'Pawn', n: 'Knight', b: 'Bishop', r: 'Rook', q: 'Queen', k: 'King' };
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
 const PROMO_KEYS: Record<string, PieceType> = { q: 'q', r: 'r', b: 'b', n: 'n' };
 const STORAGE_KEY = 'battlecore.menu.v1';
@@ -298,11 +299,10 @@ export function createHud(root: HTMLElement): Hud {
     title: 'Menu',
   });
 
-  // Online-only tools
-  const resignLabel = toolLabel('Resign');
+  // Forfeit (every mode, click twice to confirm); Offer draw is online-only.
+  const resignLabel = toolLabel('Forfeit');
   const resignBtn = button('bc-tool bc-tool--resign', [icon('flag'), resignLabel], onResignClick, {
-    hidden: true,
-    title: 'Resign',
+    title: 'Forfeit',
   });
   const drawLabel = toolLabel('Offer draw');
   const drawBtn = button('bc-tool bc-tool--draw', [icon('handshake'), drawLabel], onDrawClick, {
@@ -316,8 +316,8 @@ export function createHud(root: HTMLElement): Hud {
     window.clearTimeout(resignTimer);
     resignTimer = 0;
     resignBtn.classList.remove('is-confirm');
-    resignLabel.textContent = 'Resign';
-    resignBtn.title = 'Resign';
+    resignLabel.textContent = 'Forfeit';
+    resignBtn.title = 'Forfeit';
   }
 
   function resetDraw(): void {
@@ -335,8 +335,8 @@ export function createHud(root: HTMLElement): Hud {
       return;
     }
     resignBtn.classList.add('is-confirm');
-    resignLabel.textContent = 'Confirm resign?';
-    resignBtn.title = 'Click again to resign';
+    resignLabel.textContent = 'Confirm forfeit?';
+    resignBtn.title = 'Click again to forfeit';
     resignTimer = window.setTimeout(resetResign, RESIGN_CONFIRM_MS);
   }
 
@@ -354,7 +354,7 @@ export function createHud(root: HTMLElement): Hud {
 
   const toolbar = el(
     'div',
-    'bc-toolbar',
+    'bc-toolbar bc-toolbar--quad',
     { role: 'toolbar', 'aria-label': 'Game controls' },
     undoBtn,
     resignBtn,
@@ -385,9 +385,35 @@ export function createHud(root: HTMLElement): Hud {
     toolbar,
   );
 
+  // ----- Piece hover tag -----
+  const tipName = el('span', 'bc-tip__name');
+  const tipRole = el('span', 'bc-tip__role');
+  const pieceTip = el('div', 'bc-tip', { 'aria-hidden': 'true', hidden: true }, tipName, tipRole);
+
+  function showPieceTip(tip: PieceTip | null, x = 0, y = 0): void {
+    if (!tip) {
+      pieceTip.hidden = true;
+      return;
+    }
+    const info = PIECES[tip.color][tip.type];
+    tipName.textContent = `${info.icon} ${info.name}`;
+    const whose = tip.owner === 'yours' ? 'Yours' : tip.owner === 'enemy' ? 'Enemy' : FACTIONS[tip.color].short;
+    tipRole.textContent = `${ROLE_NAMES[tip.type]} · ${whose}`;
+    pieceTip.setAttribute('style', facVars(tip.color));
+    pieceTip.dataset.owner = tip.owner ?? '';
+    pieceTip.hidden = false;
+    // Beside the cursor, flipped to stay on screen.
+    const r = root.getBoundingClientRect();
+    const w = pieceTip.offsetWidth;
+    const h = pieceTip.offsetHeight;
+    const left = x - r.left + 16 + w > r.width ? x - r.left - 16 - w : x - r.left + 16;
+    const top = Math.min(r.height - h - 4, Math.max(4, y - r.top - h - 10));
+    pieceTip.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+  }
+
   // ----- Layers -----
   const bannerLayer = el('div', 'bc-banner-layer', { 'aria-live': 'assertive', role: 'alert' });
-  const hudLayer = el('div', 'bc-hud', undefined, topBar, muteBtn, panel);
+  const hudLayer = el('div', 'bc-hud', undefined, topBar, muteBtn, panel, pieceTip);
   const modalLayer = el('div', 'bc-modal-layer');
   root.append(hudLayer, bannerLayer, modalLayer);
 
@@ -1111,9 +1137,7 @@ export function createHud(root: HTMLElement): Hud {
   }
 
   function setOnlineMode(online: boolean): void {
-    toolbar.classList.toggle('bc-toolbar--online', online);
     undoBtn.hidden = online;
-    resignBtn.hidden = !online;
     drawBtn.hidden = !online;
     oppChip.hidden = !online;
     resetResign();
@@ -1183,15 +1207,16 @@ export function createHud(root: HTMLElement): Hud {
     });
   }
 
-  function showStart(): Promise<void> {
+  function showStart(ready: Promise<void>): Promise<void> {
     return new Promise((resolve) => {
+      const prompt = el('p', 'bc-start__prompt is-loading', undefined, 'Loading troops');
       const card = el(
         'div',
         'bc-start',
         { role: 'button', tabindex: '0', 'aria-label': 'Start BattleCore' },
         el('h1', 'bc-title', undefined, 'BattleCore'),
         el('p', 'bc-subtitle', undefined, el('span', 'bc-subtitle__w', undefined, FACTIONS.w.name), ' vs ', el('span', 'bc-subtitle__b', undefined, FACTIONS.b.name)),
-        el('p', 'bc-start__prompt', undefined, 'Tap or press any key to start'),
+        prompt,
       );
       const go = (e: Event): void => {
         e.preventDefault();
@@ -1201,10 +1226,14 @@ export function createHud(root: HTMLElement): Hud {
         window.setTimeout(() => card.remove(), 350);
         resolve();
       };
-      window.addEventListener('pointerdown', go, true);
-      window.addEventListener('keydown', go, true);
       modalLayer.append(card);
       card.focus({ preventScroll: true });
+      void ready.then(() => {
+        prompt.classList.remove('is-loading');
+        prompt.textContent = 'Tap or press any key to start';
+        window.addEventListener('pointerdown', go, true);
+        window.addEventListener('keydown', go, true);
+      });
     });
   }
 
@@ -1264,6 +1293,7 @@ export function createHud(root: HTMLElement): Hud {
     onMenu: (cb) => void menuCbs.push(cb),
     setCinematic,
     showStart,
+    showPieceTip,
     onInsetsChange: (cb) => {
       insetCbs.push(cb);
       cb(insets);
