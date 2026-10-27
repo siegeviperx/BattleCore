@@ -1,9 +1,9 @@
 import './hud.css';
 import data from '../data/pieces.json';
 import type { Color, Level, PieceType } from '../core/types';
-import type { BannerKind, Hud, MenuChoice } from './types';
+import type { BannerKind, Hud, Lobby, MenuChoice, OnlineRequest, OpponentStatus } from './types';
 
-export type { Hud, MenuChoice, BannerKind } from './types';
+export type { Hud, MenuChoice, BannerKind, Lobby, OnlineRequest, OpponentStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -30,6 +30,13 @@ const LEVELS: { id: Level; label: string; hint: string }[] = [
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
 const PROMO_KEYS: Record<string, PieceType> = { q: 'q', r: 'r', b: 'b', n: 'n' };
 const STORAGE_KEY = 'battlecore.menu.v1';
+/** Room code alphabet (no 0/O, 1/I/L to avoid mix-ups). */
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODE_LEN = 6;
+const sanitizeCode = (raw: string): string =>
+  [...raw.toUpperCase()].filter((ch) => CODE_ALPHABET.includes(ch)).join('').slice(0, CODE_LEN);
+const DRAW_COOLDOWN_MS = 10_000;
+const RESIGN_CONFIRM_MS = 3_000;
 
 /** Readable light label colour per faction (dino secondary gunmetal is too dark for text). */
 const LABEL: Record<Color, string> = { w: '#d6c48f', b: '#f0a197' };
@@ -71,11 +78,16 @@ function button(cls: string, label: string | Node[], onClick?: () => void, attrs
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const ICON_PATHS: Record<'undo' | 'flip' | 'menu' | 'chev', string> = {
+const ICON_PATHS: Record<'undo' | 'flip' | 'menu' | 'chev' | 'flag' | 'handshake' | 'copy' | 'link', string> = {
   undo: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
   flip: 'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3',
   menu: 'M4 6h16M4 12h16M4 18h16',
   chev: 'M6 15l6-6 6 6',
+  flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  handshake:
+    'M11 17l2 2a1 1 0 1 0 3-3M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4M21 3l1 11h-2M3 3 2 14l6.47 6.47a1 1 0 1 0 3-3M3 4h8',
+  copy: 'M8 8h12v12H8zM16 8V4H4v12h4',
+  link: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
 };
 
 function icon(name: keyof typeof ICON_PATHS): SVGSVGElement {
@@ -101,14 +113,25 @@ function prefersReducedMotion(): boolean {
 // Persistence
 // ---------------------------------------------------------------------------
 
+type OnlineSide = Color | 'random';
+
 interface Saved {
-  mode: 'ai' | 'local';
+  mode: 'ai' | 'local' | 'online';
   humanColor: Color;
   level: Level;
   autoRotate: boolean;
+  onlineAction: 'create' | 'join';
+  onlineSide: OnlineSide;
 }
 
-const DEFAULTS: Saved = { mode: 'ai', humanColor: 'w', level: 'medium', autoRotate: true };
+const DEFAULTS: Saved = {
+  mode: 'ai',
+  humanColor: 'w',
+  level: 'medium',
+  autoRotate: true,
+  onlineAction: 'create',
+  onlineSide: 'random',
+};
 
 function loadSaved(): Saved {
   try {
@@ -116,13 +139,54 @@ function loadSaved(): Saved {
     if (!raw) return { ...DEFAULTS };
     const p = JSON.parse(raw) as Partial<Saved>;
     return {
-      mode: p.mode === 'local' ? 'local' : 'ai',
+      mode: p.mode === 'local' || p.mode === 'online' ? p.mode : 'ai',
       humanColor: p.humanColor === 'b' ? 'b' : 'w',
       level: LEVELS.some((l) => l.id === p.level) ? (p.level as Level) : DEFAULTS.level,
       autoRotate: typeof p.autoRotate === 'boolean' ? p.autoRotate : DEFAULTS.autoRotate,
+      onlineAction: p.onlineAction === 'join' ? 'join' : 'create',
+      onlineSide: p.onlineSide === 'w' || p.onlineSide === 'b' ? p.onlineSide : 'random',
     };
   } catch {
     return { ...DEFAULTS };
+  }
+}
+
+/** Room code from `?room=XXXXXX` in the page URL, if valid. */
+function roomFromUrl(): string | null {
+  try {
+    const raw = new URLSearchParams(location.search).get('room');
+    if (!raw) return null;
+    const code = sanitizeCode(raw.replace(/\s+/g, ''));
+    return code.length === CODE_LEN ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Copy text to the clipboard; resolves true on success. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through to the legacy path */
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+    const prev = document.activeElement as HTMLElement | null;
+    document.body.append(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    prev?.focus({ preventScroll: true });
+    return ok;
+  } catch {
+    return false;
   }
 }
 
@@ -144,12 +208,28 @@ export function createHud(root: HTMLElement): Hud {
   const undoCbs: (() => void)[] = [];
   const flipCbs: (() => void)[] = [];
   const menuCbs: (() => void)[] = [];
+  const resignCbs: (() => void)[] = [];
+  const drawCbs: (() => void)[] = [];
 
   // ----- Turn pill -----
   const turnText = el('span', 'bc-turn__text');
   const turnDots = el('span', 'bc-dots', { 'aria-hidden': 'true' }, el('i'), el('i'), el('i'));
   const thinkingLabel = el('span', 'bc-turn__thinking', undefined, 'thinking', turnDots);
   const turnPill = el('div', 'bc-turn', { role: 'status', 'aria-live': 'polite' }, turnText, thinkingLabel);
+
+  // ----- Opponent status chip (online only) -----
+  const oppIcon = el('span', 'bc-opp__icon', { 'aria-hidden': 'true' });
+  const oppName = el('span', 'bc-opp__name');
+  const oppText = el('span', 'bc-opp__text');
+  const oppChip = el(
+    'div',
+    'bc-opp',
+    { role: 'status', 'aria-live': 'polite', 'data-status': 'waiting', hidden: true },
+    el('span', 'bc-opp__dot', { 'aria-hidden': 'true' }),
+    oppIcon,
+    el('span', 'bc-opp__label', undefined, oppName, oppText),
+  );
+  const topBar = el('div', 'bc-top', undefined, turnPill, oppChip);
 
   // ----- Side panel -----
   const trays: Record<Color, { list: HTMLElement; adv: HTMLElement }> = {
@@ -169,16 +249,79 @@ export function createHud(root: HTMLElement): Hud {
   const movesEmpty = el('p', 'bc-moves__empty', undefined, 'No moves yet. Hold the line!');
   const movesBox = el('div', 'bc-moves', undefined, movesEmpty, movesList);
 
-  const undoBtn = button('bc-tool', [icon('undo'), el('span', undefined, undefined, 'Undo')], () =>
-    undoCbs.forEach((cb) => cb()),
+  const toolLabel = (text: string): HTMLSpanElement => el('span', 'bc-tool__label', undefined, text);
+  const undoBtn = button('bc-tool', [icon('undo'), toolLabel('Undo')], () => undoCbs.forEach((cb) => cb()));
+  const flipBtn = button('bc-tool', [icon('flip'), toolLabel('Flip view')], () => flipCbs.forEach((cb) => cb()), {
+    title: 'Flip view',
+  });
+  const menuBtn = button('bc-tool', [icon('menu'), toolLabel('Menu')], () => menuCbs.forEach((cb) => cb()), {
+    title: 'Menu',
+  });
+
+  // Online-only tools
+  const resignLabel = toolLabel('Resign');
+  const resignBtn = button('bc-tool bc-tool--resign', [icon('flag'), resignLabel], onResignClick, {
+    hidden: true,
+    title: 'Resign',
+  });
+  const drawLabel = toolLabel('Offer draw');
+  const drawBtn = button('bc-tool bc-tool--draw', [icon('handshake'), drawLabel], onDrawClick, {
+    hidden: true,
+    title: 'Offer draw',
+  });
+  let resignTimer = 0;
+  let drawTimer = 0;
+
+  function resetResign(): void {
+    window.clearTimeout(resignTimer);
+    resignTimer = 0;
+    resignBtn.classList.remove('is-confirm');
+    resignLabel.textContent = 'Resign';
+    resignBtn.title = 'Resign';
+  }
+
+  function resetDraw(): void {
+    window.clearTimeout(drawTimer);
+    drawTimer = 0;
+    drawBtn.disabled = false;
+    drawLabel.textContent = 'Offer draw';
+    drawBtn.title = 'Offer draw';
+  }
+
+  function onResignClick(): void {
+    if (resignBtn.classList.contains('is-confirm')) {
+      resetResign();
+      resignCbs.forEach((cb) => cb());
+      return;
+    }
+    resignBtn.classList.add('is-confirm');
+    resignLabel.textContent = 'Confirm resign?';
+    resignBtn.title = 'Click again to resign';
+    resignTimer = window.setTimeout(resetResign, RESIGN_CONFIRM_MS);
+  }
+
+  function onDrawClick(): void {
+    if (drawBtn.disabled) return;
+    const hadFocus = document.activeElement === drawBtn;
+    drawBtn.disabled = true;
+    drawLabel.textContent = 'Draw offered';
+    drawBtn.title = 'Draw offered';
+    // Keep keyboard users in the toolbar instead of dropping focus to <body>.
+    if (hadFocus) flipBtn.focus({ preventScroll: true });
+    drawTimer = window.setTimeout(resetDraw, DRAW_COOLDOWN_MS);
+    drawCbs.forEach((cb) => cb());
+  }
+
+  const toolbar = el(
+    'div',
+    'bc-toolbar',
+    { role: 'toolbar', 'aria-label': 'Game controls' },
+    undoBtn,
+    resignBtn,
+    drawBtn,
+    flipBtn,
+    menuBtn,
   );
-  const flipBtn = button('bc-tool', [icon('flip'), el('span', undefined, undefined, 'Flip view')], () =>
-    flipCbs.forEach((cb) => cb()),
-  );
-  const menuBtn = button('bc-tool', [icon('menu'), el('span', undefined, undefined, 'Menu')], () =>
-    menuCbs.forEach((cb) => cb()),
-  );
-  const toolbar = el('div', 'bc-toolbar', { role: 'toolbar', 'aria-label': 'Game controls' }, undoBtn, flipBtn, menuBtn);
 
   const lastMoveMini = el('span', 'bc-panel__last');
   const collapseBtn = button(
@@ -204,15 +347,21 @@ export function createHud(root: HTMLElement): Hud {
 
   // ----- Layers -----
   const bannerLayer = el('div', 'bc-banner-layer', { 'aria-live': 'assertive', role: 'alert' });
-  const hudLayer = el('div', 'bc-hud', undefined, turnPill, panel);
+  const hudLayer = el('div', 'bc-hud', undefined, topBar, panel);
   const modalLayer = el('div', 'bc-modal-layer');
   root.append(hudLayer, bannerLayer, modalLayer);
 
   // ----- State -----
   let menuEl: HTMLElement | null = null;
+  let lobbyClose: (() => void) | null = null;
 
   function scrollMoves(): void {
     movesBox.scrollTop = movesBox.scrollHeight;
+  }
+
+  /** HUD is hidden while the menu or the lobby is up. */
+  function syncHudHidden(): void {
+    setHudHidden(menuEl !== null || lobbyClose !== null);
   }
 
   function setHudHidden(hidden: boolean): void {
@@ -221,9 +370,9 @@ export function createHud(root: HTMLElement): Hud {
   }
 
   /** Shows a modal dialog; returns a function that closes it and restores focus. */
-  function openModal(node: HTMLElement, label: string): () => void {
+  function openModal(node: HTMLElement, label: string, opts: { instant?: boolean } = {}): () => void {
     const prevFocus = document.activeElement as HTMLElement | null;
-    const wrap = el('div', 'bc-modal-backdrop', undefined, node);
+    const wrap = el('div', `bc-modal-backdrop${opts.instant ? ' is-instant' : ''}`, undefined, node);
     node.setAttribute('role', 'dialog');
     node.setAttribute('aria-modal', 'true');
     node.setAttribute('aria-label', label);
@@ -240,28 +389,35 @@ export function createHud(root: HTMLElement): Hud {
   // Menu
   // -------------------------------------------------------------------------
 
+  let urlRoomUsed = false;
+
   function showMenu(): Promise<MenuChoice> {
     menuEl?.remove();
     const state = loadSaved();
+    let joinCode = '';
+    // An invite link (?room=XXXXXX) preselects Online -> Join, once per page load.
+    const urlRoom = urlRoomUsed ? null : roomFromUrl();
+    urlRoomUsed = true;
+    if (urlRoom) {
+      state.mode = 'online';
+      state.onlineAction = 'join';
+      joinCode = urlRoom;
+    }
     setHudHidden(true);
 
     return new Promise<MenuChoice>((resolve) => {
       // Mode cards
-      const modeCard = (id: 'ai' | 'local' | 'online', title: string, desc: string, badge: string): HTMLButtonElement => {
-        const disabled = id === 'online';
-        const b = button(
+      const modeCard = (id: 'ai' | 'local' | 'online', title: string, desc: string, badge: string): HTMLButtonElement =>
+        button(
           `bc-mode bc-mode--${id}`,
           [
             el('span', 'bc-mode__badge', { 'aria-hidden': 'true' }, badge),
             el('span', 'bc-mode__title', undefined, title),
             el('span', 'bc-mode__desc', undefined, desc),
-            ...(disabled ? [el('span', 'bc-tag', undefined, 'Coming soon')] : []),
           ],
-          disabled ? undefined : () => setMode(id),
-          { disabled, 'aria-pressed': disabled ? undefined : 'false' },
+          () => setMode(id),
+          { 'aria-pressed': 'false' },
         );
-        return b;
-      };
       const aiCard = modeCard('ai', 'vs Computer', 'Take on the war-room AI', PIECES.b.k.icon);
       const localCard = modeCard('local', 'Local 2-Player', 'Two generals, one screen', `${PIECES.w.p.icon}${PIECES.b.p.icon}`);
       const onlineCard = modeCard('online', 'Online', 'Private rooms with a code', '📡');
@@ -327,12 +483,117 @@ export function createHud(root: HTMLElement): Hud {
         ),
       );
 
+      // Online: create / join
+      const actionBtns = (
+        [
+          ['create', 'Create room', 'Host a battle'],
+          ['join', 'Join room', 'Enter a code'],
+        ] as const
+      ).map(([id, label, hint]) =>
+        button(
+          'bc-seg__btn',
+          [el('span', 'bc-seg__label', undefined, label), el('span', 'bc-seg__hint', undefined, hint)],
+          () => {
+            state.onlineAction = id;
+            sync();
+            if (id === 'join') requestAnimationFrame(() => codeInput.focus({ preventScroll: true }));
+          },
+          { 'aria-pressed': 'false', 'data-action': id },
+        ),
+      );
+
+      const onlineSideBtns = (['w', 'b', 'random'] as OnlineSide[]).map((c) => {
+        const isRandom = c === 'random';
+        return button(
+          `bc-side bc-side--${c}`,
+          [
+            el('span', 'bc-side__icon', { 'aria-hidden': 'true' }, isRandom ? '🎲' : PIECES[c].k.icon),
+            el(
+              'span',
+              'bc-side__text',
+              undefined,
+              el('span', 'bc-side__name', undefined, isRandom ? 'Random' : FACTIONS[c].name),
+              el('span', 'bc-side__sub', undefined, isRandom ? 'HQ assigns sides' : c === 'w' ? 'Moves first' : 'Moves second'),
+            ),
+          ],
+          () => {
+            state.onlineSide = c;
+            sync();
+          },
+          {
+            'aria-pressed': 'false',
+            'data-side': c,
+            style: isRandom ? '--fac:#6b5531;--fac2:#f39a3c;--facl:#f4ead2' : facVars(c),
+          },
+        );
+      });
+
+      const codeInput = el('input', 'bc-code', {
+        type: 'text',
+        id: 'bc-join-code',
+        inputmode: 'text',
+        autocomplete: 'off',
+        autocapitalize: 'characters',
+        autocorrect: 'off',
+        spellcheck: 'false',
+        enterkeyhint: 'go',
+        maxlength: String(CODE_LEN + 6),
+        placeholder: 'XXXXXX',
+        'aria-describedby': 'bc-join-hint',
+      });
+      codeInput.value = joinCode;
+      const codeHint = el('p', 'bc-code__hint', { id: 'bc-join-hint', 'aria-live': 'polite' });
+      codeInput.addEventListener('input', () => {
+        const clean = sanitizeCode(codeInput.value);
+        if (clean !== codeInput.value) codeInput.value = clean;
+        joinCode = clean;
+        sync();
+      });
+      codeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          deployBtn.click();
+        }
+      });
+
+      const createPane = el(
+        'div',
+        'bc-field',
+        undefined,
+        el('div', 'bc-field__label', undefined, 'Choose your army'),
+        el('div', 'bc-sides bc-sides--3', undefined, ...onlineSideBtns),
+      );
+      const joinPane = el(
+        'div',
+        'bc-field',
+        undefined,
+        el('label', 'bc-field__label', { for: 'bc-join-code' }, 'Room code'),
+        codeInput,
+        codeHint,
+      );
+      const onlineOptions = el(
+        'div',
+        'bc-options',
+        undefined,
+        el('div', 'bc-seg bc-seg--2', { role: 'group', 'aria-label': 'Online game' }, ...actionBtns),
+        createPane,
+        joinPane,
+      );
+
+      const canDeploy = (): boolean =>
+        state.mode !== 'online' || state.onlineAction === 'create' || joinCode.length === CODE_LEN;
+
       const deployBtn = button('bc-deploy', 'Deploy!', () => {
+        if (!canDeploy()) return;
         save(state);
-        const choice: MenuChoice =
-          state.mode === 'ai'
-            ? { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false }
-            : { mode: 'local', autoRotate: state.autoRotate };
+        let choice: MenuChoice;
+        if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false };
+        else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate };
+        else {
+          const online: OnlineRequest =
+            state.onlineAction === 'join' ? { action: 'join', code: joinCode } : { action: 'create', side: state.onlineSide };
+          choice = { mode: 'online', autoRotate: false, online };
+        }
         close();
         resolve(choice);
       });
@@ -344,6 +605,7 @@ export function createHud(root: HTMLElement): Hud {
         el('div', 'bc-modes', { role: 'group', 'aria-label': 'Game mode' }, aiCard, localCard, onlineCard),
         aiOptions,
         localOptions,
+        onlineOptions,
         deployBtn,
       );
 
@@ -361,7 +623,7 @@ export function createHud(root: HTMLElement): Hud {
         card,
       );
 
-      function setMode(m: 'ai' | 'local'): void {
+      function setMode(m: 'ai' | 'local' | 'online'): void {
         state.mode = m;
         sync();
       }
@@ -369,8 +631,19 @@ export function createHud(root: HTMLElement): Hud {
       function sync(): void {
         aiCard.setAttribute('aria-pressed', String(state.mode === 'ai'));
         localCard.setAttribute('aria-pressed', String(state.mode === 'local'));
+        onlineCard.setAttribute('aria-pressed', String(state.mode === 'online'));
         aiOptions.hidden = state.mode !== 'ai';
         localOptions.hidden = state.mode !== 'local';
+        onlineOptions.hidden = state.mode !== 'online';
+        for (const b of actionBtns) b.setAttribute('aria-pressed', String(b.dataset.action === state.onlineAction));
+        createPane.hidden = state.onlineAction !== 'create';
+        joinPane.hidden = state.onlineAction !== 'join';
+        for (const b of onlineSideBtns) b.setAttribute('aria-pressed', String(b.dataset.side === state.onlineSide));
+        const n = joinCode.length;
+        codeHint.textContent =
+          n === CODE_LEN ? 'Code locked in. Ready to deploy!' : `${n}/${CODE_LEN} · letters and digits 2-9 from your invite`;
+        codeHint.classList.toggle('is-ready', n === CODE_LEN);
+        deployBtn.disabled = !canDeploy();
         for (const c of ['w', 'b'] as Color[]) sideBtns[c].setAttribute('aria-pressed', String(state.humanColor === c));
         for (const b of levelBtns) b.setAttribute('aria-pressed', String(b.dataset.level === state.level));
         rotateInput.checked = state.autoRotate;
@@ -383,11 +656,9 @@ export function createHud(root: HTMLElement): Hud {
       function close(): void {
         document.removeEventListener('keydown', onKey);
         menu.classList.add('is-leaving');
-        setHudHidden(false);
-        const done = (): void => {
-          menu.remove();
-          if (menuEl === menu) menuEl = null;
-        };
+        if (menuEl === menu) menuEl = null;
+        syncHudHidden();
+        const done = (): void => menu.remove();
         if (prefersReducedMotion()) done();
         else {
           menu.addEventListener('animationend', done, { once: true });
@@ -399,7 +670,7 @@ export function createHud(root: HTMLElement): Hud {
       document.addEventListener('keydown', onKey);
       menuEl = menu;
       modalLayer.append(menu);
-      requestAnimationFrame(() => deployBtn.focus({ preventScroll: true }));
+      requestAnimationFrame(() => (deployBtn.disabled ? codeInput : deployBtn).focus({ preventScroll: true }));
     });
   }
 
@@ -549,6 +820,222 @@ export function createHud(root: HTMLElement): Hud {
     undoBtn.disabled = !enabled;
   }
 
+  // -------------------------------------------------------------------------
+  // Online play
+  // -------------------------------------------------------------------------
+
+  /** Brief "Copied!" feedback on a button's label span. */
+  function flashLabel(btn: HTMLButtonElement, labelEl: HTMLElement, text: string, ok: boolean): void {
+    const original = labelEl.dataset.label ?? labelEl.textContent ?? '';
+    labelEl.dataset.label = original;
+    labelEl.textContent = text;
+    btn.classList.toggle('is-copied', ok);
+    btn.classList.toggle('is-failed', !ok);
+    window.clearTimeout(Number(btn.dataset.timer ?? 0));
+    btn.dataset.timer = String(
+      window.setTimeout(() => {
+        labelEl.textContent = original;
+        btn.classList.remove('is-copied', 'is-failed');
+      }, 1800),
+    );
+  }
+
+  function showLobby(code: string | null, side: Color | null): Lobby {
+    const replacing = lobbyClose !== null;
+    lobbyClose?.();
+
+    let resolveCancel!: () => void;
+    const cancelled = new Promise<void>((r) => (resolveCancel = r));
+    let open = true;
+
+    const status = el('p', 'bc-lobby__status', { role: 'status', 'aria-live': 'polite' });
+    const cancelBtn = button('bc-btn', 'Cancel', () => {
+      if (!open) return;
+      close();
+      resolveCancel();
+    });
+
+    const children: Node[] = [el('div', 'bc-gameover__stripe', { 'aria-hidden': 'true' })];
+    let label: string;
+
+    if (code === null) {
+      label = 'Connecting to HQ';
+      children.push(
+        el('div', 'bc-radar', { 'aria-hidden': 'true' }, el('span', 'bc-radar__sweep'), el('span', 'bc-radar__blip')),
+        el('h2', 'bc-dialog__title bc-lobby__title', undefined, 'Connecting to HQ…'),
+        el('p', 'bc-dialog__sub', undefined, 'Establishing a secure line to the war room.'),
+      );
+    } else {
+      label = `Room ${code}`;
+      const link = `${location.origin}${location.pathname}?room=${encodeURIComponent(code)}`;
+      const copyLabel = el('span', undefined, undefined, 'Copy code');
+      const linkLabel = el('span', undefined, undefined, 'Copy invite link');
+      const copyBtn = button('bc-btn bc-btn--small', [icon('copy'), copyLabel], undefined, { 'data-autofocus': true });
+      const linkBtn = button('bc-btn bc-btn--small', [icon('link'), linkLabel], undefined, { title: link });
+      copyBtn.addEventListener('click', () => {
+        void copyText(code).then((ok) => flashLabel(copyBtn, copyLabel, ok ? 'Copied!' : 'Copy failed', ok));
+      });
+      linkBtn.addEventListener('click', () => {
+        void copyText(link).then((ok) => flashLabel(linkBtn, linkLabel, ok ? 'Copied!' : 'Copy failed', ok));
+      });
+
+      const tiles = el(
+        'div',
+        'bc-lobby__code',
+        undefined,
+        el('span', 'bc-sr-only', undefined, code.split('').join(' ')),
+        ...code.split('').map((ch) => el('span', 'bc-lobby__char', { 'aria-hidden': 'true' }, ch)),
+      );
+      children.push(
+        el('div', 'bc-field__label bc-lobby__label', undefined, 'Room code'),
+        tiles,
+        el('div', 'bc-lobby__copy', undefined, copyBtn, linkBtn),
+      );
+      if (side) {
+        children.push(
+          el(
+            'div',
+            'bc-lobby__side',
+            { style: facVars(side) },
+            el('span', 'bc-side__icon', { 'aria-hidden': 'true' }, PIECES[side].k.icon),
+            el('span', undefined, undefined, 'You command the ', el('strong', undefined, undefined, FACTIONS[side].name)),
+          ),
+        );
+      }
+      status.append('Waiting for an opponent', el('span', 'bc-dots', { 'aria-hidden': 'true' }, el('i'), el('i'), el('i')));
+      children.push(status, el('p', 'bc-lobby__tip', undefined, 'Send the code or link to a friend. The battle starts when they join.'));
+    }
+    children.push(el('div', 'bc-dialog__actions', undefined, cancelBtn));
+
+    const node = el('div', `bc-dialog bc-lobby${code === null ? ' is-connecting' : ''}`, undefined, ...children);
+
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelBtn.click();
+      }
+    };
+
+    const closeModal = openModal(node, label, { instant: replacing });
+    document.addEventListener('keydown', onKey);
+
+    function close(): void {
+      if (!open) return;
+      open = false;
+      document.removeEventListener('keydown', onKey);
+      closeModal();
+      if (lobbyClose === close) lobbyClose = null;
+      syncHudHidden();
+    }
+
+    lobbyClose = close;
+    syncHudHidden();
+    return { close, cancelled };
+  }
+
+  function setOnlineMode(online: boolean): void {
+    toolbar.classList.toggle('bc-toolbar--online', online);
+    undoBtn.hidden = online;
+    resignBtn.hidden = !online;
+    drawBtn.hidden = !online;
+    oppChip.hidden = !online;
+    resetResign();
+    resetDraw();
+  }
+
+  const OPP_TEXT: Record<OpponentStatus, string> = {
+    waiting: 'Waiting for opponent',
+    connected: 'Opponent online',
+    disconnected: 'Opponent reconnecting…',
+    left: 'Opponent left',
+  };
+
+  function setOpponentStatus(status: OpponentStatus, side: Color): void {
+    oppChip.dataset.status = status;
+    oppChip.setAttribute('style', facVars(side));
+    oppIcon.textContent = PIECES[side].k.icon;
+    oppName.textContent = FACTIONS[side].short;
+    oppText.textContent = OPP_TEXT[status];
+  }
+
+  /** Draw offer prompt. Y / N (Escape = decline) are captured while it is open. */
+  function askDraw(): Promise<boolean> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (accept: boolean): void => {
+        if (done) return;
+        done = true;
+        document.removeEventListener('keydown', onKey, true);
+        close();
+        resolve(accept);
+      };
+      const keyHint = (k: string): HTMLElement => el('kbd', 'bc-kbd', { 'aria-hidden': 'true' }, k);
+      const node = el(
+        'div',
+        'bc-dialog bc-truce',
+        undefined,
+        el('div', 'bc-gameover__stripe bc-truce__stripe', { 'aria-hidden': 'true' }),
+        el('div', 'bc-truce__flag', { 'aria-hidden': 'true' }, '🏳️'),
+        el('h2', 'bc-dialog__title', undefined, 'The enemy offers a truce'),
+        el('p', 'bc-dialog__sub', undefined, 'Accept a draw and end the battle here?'),
+        el(
+          'div',
+          'bc-dialog__actions',
+          undefined,
+          button('bc-btn bc-btn--primary', [el('span', undefined, undefined, 'Accept'), keyHint('Y')], () => finish(true), {
+            'aria-keyshortcuts': 'Y',
+          }),
+          button('bc-btn', [el('span', undefined, undefined, 'Decline'), keyHint('N')], () => finish(false), {
+            'aria-keyshortcuts': 'N',
+            'data-autofocus': true,
+          }),
+        ),
+      );
+      const onKey = (e: KeyboardEvent): void => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const k = e.key.toLowerCase();
+        if (k === 'y' || k === 'n' || k === 'escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          finish(k === 'y');
+        }
+      };
+      document.addEventListener('keydown', onKey, true);
+      const close = openModal(node, 'The enemy offers a truce');
+    });
+  }
+
+  function showMessage(title: string, text: string): Promise<void> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        document.removeEventListener('keydown', onKey, true);
+        close();
+        resolve();
+      };
+      const node = el(
+        'div',
+        'bc-dialog bc-message',
+        undefined,
+        el('div', 'bc-gameover__stripe', { 'aria-hidden': 'true' }),
+        el('h2', 'bc-dialog__title', undefined, title),
+        el('p', 'bc-dialog__sub', undefined, text),
+        el('div', 'bc-dialog__actions', undefined, button('bc-btn bc-btn--primary', 'OK', finish, { 'data-autofocus': true })),
+      );
+      const onKey = (e: KeyboardEvent): void => {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          finish();
+        }
+      };
+      document.addEventListener('keydown', onKey, true);
+      const close = openModal(node, title);
+    });
+  }
+
   // Initial state
   setTurn('w');
   setMoves([]);
@@ -567,5 +1054,12 @@ export function createHud(root: HTMLElement): Hud {
     onUndo: (cb) => void undoCbs.push(cb),
     onFlip: (cb) => void flipCbs.push(cb),
     onMenu: (cb) => void menuCbs.push(cb),
+    showLobby,
+    setOnlineMode,
+    setOpponentStatus,
+    onResign: (cb) => void resignCbs.push(cb),
+    onOfferDraw: (cb) => void drawCbs.push(cb),
+    askDraw,
+    showMessage,
   };
 }

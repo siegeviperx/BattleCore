@@ -1,0 +1,5 @@
+{
+  "name": "battlecore-shared",
+  "private": true,
+  "type": "module"
+}

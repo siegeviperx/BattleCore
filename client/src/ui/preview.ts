@@ -1,6 +1,7 @@
 // Throwaway demo page for the HUD. Not part of the game build.
 import { createHud } from './index';
 import type { PieceType } from '../core/types';
+import type { Lobby, OpponentStatus } from './types';
 
 const root = document.getElementById('ui')!;
 const logEl = document.getElementById('log')!;
@@ -16,6 +17,8 @@ const hud = createHud(root);
 hud.onUndo(() => log('undo clicked'));
 hud.onFlip(() => log('flip clicked'));
 hud.onMenu(() => log('menu clicked'));
+hud.onResign(() => log('resign confirmed'));
+hud.onOfferDraw(() => log('draw offered'));
 
 const params = new URLSearchParams(location.search);
 const step = params.get('step');
@@ -43,7 +46,52 @@ function fillGame(): void {
   hud.setUndoEnabled(true);
 }
 
+/** Lobby flow: connecting -> code -> (opponent joins) close. Logs cancel. */
+function trackLobby(lobby: Lobby, name: string): void {
+  void lobby.cancelled.then(() => log(`${name} -> cancelled`));
+}
+
+const STATUSES: OpponentStatus[] = ['waiting', 'connected', 'disconnected', 'left'];
+
 async function run(): Promise<void> {
+  if (step === 'lobby-connecting') {
+    trackLobby(hud.showLobby(null, null), 'lobby-connecting');
+    return;
+  }
+  if (step === 'lobby') {
+    const code = params.get('code') ?? 'K7QM2P';
+    const side = (params.get('color') as 'w' | 'b') ?? 'w';
+    trackLobby(hud.showLobby(code, side), 'lobby');
+    return;
+  }
+  if (step === 'online') {
+    fillGame();
+    hud.setOnlineMode(true);
+    const fixed = params.get('status') as OpponentStatus | null;
+    if (fixed) {
+      hud.setOpponentStatus(fixed, 'b');
+      return;
+    }
+    for (let i = 0; ; i++) {
+      hud.setOpponentStatus(STATUSES[i % STATUSES.length], 'b');
+      await wait(2500);
+    }
+  }
+  if (step === 'askdraw') {
+    fillGame();
+    hud.setOnlineMode(true);
+    hud.setOpponentStatus('connected', 'b');
+    const accept = await hud.askDraw();
+    log(`askDraw -> ${accept}`);
+    return;
+  }
+  if (step === 'message') {
+    fillGame();
+    const t0 = Date.now();
+    await hud.showMessage(params.get('title') ?? 'Mission aborted', params.get('text') ?? 'Room not found. Check the code and try again.');
+    log(`message -> closed after ${Date.now() - t0}ms`);
+    return;
+  }
   if (step === 'hud') {
     fillGame();
     return;
@@ -81,6 +129,35 @@ async function run(): Promise<void> {
   // Full scripted run.
   const choice = await hud.showMenu();
   log(`menu -> ${JSON.stringify(choice)}`);
+  if (choice.mode === 'online') {
+    // Simulated online handshake: connecting -> room code -> opponent joins.
+    let cancelled = false;
+    const watch = (l: Lobby): Lobby => {
+      void l.cancelled.then(() => {
+        cancelled = true;
+        log('lobby -> cancelled');
+      });
+      return l;
+    };
+    let lobby = watch(hud.showLobby(null, null));
+    await wait(1200);
+    if (cancelled) return void run();
+    const side = choice.online?.action === 'create' && choice.online.side !== 'random' ? choice.online.side : 'w';
+    hud.setOnlineMode(true);
+    hud.setOpponentStatus('waiting', side === 'w' ? 'b' : 'w');
+    if (choice.online?.action === 'create') {
+      lobby = watch(hud.showLobby('K7QM2P', side));
+      await wait(Number(params.get('lobbyMs') ?? 4000));
+      if (cancelled) {
+        hud.setOnlineMode(false);
+        return void run();
+      }
+    }
+    lobby.close();
+    lobby.close(); // idempotent
+    hud.setOpponentStatus('connected', side === 'w' ? 'b' : 'w');
+    hud.showBanner('You move first!', 'info');
+  }
   hud.setUndoEnabled(false);
   for (let i = 1; i <= SAN.length; i++) {
     hud.setMoves(SAN.slice(0, i));
@@ -99,6 +176,7 @@ async function run(): Promise<void> {
   await wait(1500);
   const r = await hud.showGameOver('Victory!', 'Baby Army wins by checkmate.');
   log(`game over -> ${r}`);
+  hud.setOnlineMode(false);
   if (r === 'menu') void run();
 }
 

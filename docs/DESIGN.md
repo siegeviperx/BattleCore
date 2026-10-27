@@ -154,6 +154,9 @@ The opponent's move is never delayed by the other player's fight animation.
 
 ## 7. Online Play
 
+> **Status:** implemented in M2 (`server/`, protocol in `shared/protocol.ts`). Not yet hosted.
+> Clocks, quick-match, and resuming after a page reload are not built yet.
+
 - **Architecture:** a Node.js game server running WebSockets. It keeps the official game state and
   checks every move with chess.js. Clients only send move requests.
 - **Rooms:** host makes a room and gets a 6-character code; friend joins with the code.

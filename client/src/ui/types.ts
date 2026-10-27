@@ -1,15 +1,30 @@
 import type { Color, Level, PieceType } from '../core/types';
 
+export type OnlineRequest =
+  | { action: 'create'; side: Color | 'random' }
+  | { action: 'join'; code: string };
+
 export interface MenuChoice {
-  mode: 'ai' | 'local';
+  mode: 'ai' | 'local' | 'online';
   /** vs Computer only: which side the human plays. */
   humanColor?: Color;
   level?: Level;
   /** Local 2P: rotate the camera to face the side to move. */
   autoRotate: boolean;
+  /** Online only. */
+  online?: OnlineRequest;
 }
 
 export type BannerKind = 'check' | 'mate' | 'draw' | 'info';
+
+export type OpponentStatus = 'waiting' | 'connected' | 'disconnected' | 'left';
+
+export interface Lobby {
+  /** Close the lobby overlay (game is starting or was aborted). */
+  close(): void;
+  /** Resolves if the player presses Cancel. */
+  cancelled: Promise<void>;
+}
 
 export interface Hud {
   /** Show the main menu and resolve with the player's choice. */
@@ -27,4 +42,17 @@ export interface Hud {
   onUndo(cb: () => void): void;
   onFlip(cb: () => void): void;
   onMenu(cb: () => void): void;
+
+  // --- Online play ---
+  /** Overlay shown while connecting / waiting for an opponent. `code` is null while still connecting. */
+  showLobby(code: string | null, side: Color | null): Lobby;
+  /** Online games: swap Undo for Resign + Offer Draw, show the opponent status chip. False restores offline controls. */
+  setOnlineMode(online: boolean): void;
+  setOpponentStatus(status: OpponentStatus, side: Color): void;
+  onResign(cb: () => void): void;
+  onOfferDraw(cb: () => void): void;
+  /** Ask whether to accept the opponent's draw offer. */
+  askDraw(): Promise<boolean>;
+  /** Simple blocking message (e.g. "Room not found"). Resolves on OK. */
+  showMessage(title: string, text: string): Promise<void>;
 }
