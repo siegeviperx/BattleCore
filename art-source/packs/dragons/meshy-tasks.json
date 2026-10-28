@@ -5,5 +5,60 @@
       "id": "01a18042-3eab-719c-ad05-554c5c9e688d"
     },
     "model": "01a18042-ead4-70b9-8df4-e6dd92eeb5a9"
+  },
+  "q": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-adcb-7688-8c39-fb347472bb37"
+    },
+    "model": "01a18048-33bf-7705-acdc-ce7f4da867bd"
+  },
+  "r": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-b1be-76b7-98be-3cd86e2bdc78"
+    },
+    "model": "01a18048-374c-760e-8696-2dd69fba35f5"
+  },
+  "b": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-b563-70c0-8ed6-a819f247b167"
+    },
+    "model": "01a18048-39d4-75a1-bb02-caa4c209075b"
+  },
+  "n": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-b8b0-7206-8793-e0b685745450"
+    },
+    "model": "01a18048-3d6f-7085-a7f7-85a44ee9348f"
+  },
+  "p": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-bbdc-73ee-86da-e1f379480119"
+    },
+    "model": "01a18048-3fd3-75f2-84c8-32e932c8d7e5"
+  },
+  "p2": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-bf73-7598-8934-a54a90793be4"
+    }
+  },
+  "p3": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-c309-750d-8ae2-b27a62784516"
+    },
+    "model": "01a18048-4371-77c4-b9d8-b3421df64373"
+  },
+  "p4": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18046-c6da-7196-993b-50820f84dd35"
+    },
+    "model": "01a18048-46fe-77ba-a1eb-0e201ea7543c"
   }
 }

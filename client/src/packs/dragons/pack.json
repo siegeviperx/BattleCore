@@ -46,7 +46,10 @@
         "kind": "spinout"
       },
       "looks": [
-        {}
+        {
+          "art": "pieces/q.png",
+          "model": "models/q.glb"
+        }
       ]
     },
     "r": {
@@ -64,7 +67,10 @@
         "kind": "topple"
       },
       "looks": [
-        {}
+        {
+          "art": "pieces/r.png",
+          "model": "models/r.glb"
+        }
       ]
     },
     "b": {
@@ -77,7 +83,10 @@
         "kind": "spinout"
       },
       "looks": [
-        {}
+        {
+          "art": "pieces/b.png",
+          "model": "models/b.glb"
+        }
       ]
     },
     "n": {
@@ -98,7 +107,9 @@
         {
           "tuning": {
             "flier": false
-          }
+          },
+          "art": "pieces/n.png",
+          "model": "models/n.glb"
         }
       ]
     },
@@ -115,10 +126,21 @@
         "kind": "pratfall"
       },
       "looks": [
-        {},
-        {},
-        {},
-        {}
+        {
+          "art": "pieces/p.png",
+          "model": "models/p.glb"
+        },
+        {
+          "art": "pieces/p2.png"
+        },
+        {
+          "art": "pieces/p3.png",
+          "model": "models/p3.glb"
+        },
+        {
+          "art": "pieces/p4.png",
+          "model": "models/p4.glb"
+        }
       ]
     }
   }
