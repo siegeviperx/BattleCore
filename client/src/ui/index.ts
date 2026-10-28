@@ -3,7 +3,7 @@ import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import { audio, sfx, type SoundMode, type VolumeKind } from '../audio';
 import guide from '../data/guide.json';
 import { LESSON_GROUPS, LESSONS, completedLessons, lessonText } from '../core/lessons';
-import { GLYPHS, army, pieceLook } from '../packs';
+import { GLYPHS, PACKS, PACK_LIST, armiesFor, army, onMatchupChange, pieceLook, urlMatchup, validMatchup, type Army, type Matchup, type Pack } from '../packs';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
 import type { BannerKind, CoachAction, CoachState, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
 
@@ -20,11 +20,24 @@ interface FactionInfo {
   secondary: string;
 }
 
+/** The armies in play (they change when a new game starts with other armies). */
+const faction = (c: Color): FactionInfo => ({ name: army(c).name, short: army(c).short, ...army(c).colors });
 const FACTIONS: Record<Color, FactionInfo> = {
-  w: { name: army('w').name, short: army('w').short, ...army('w').colors },
-  b: { name: army('b').name, short: army('b').short, ...army('b').colors },
+  get w() {
+    return faction('w');
+  },
+  get b() {
+    return faction('b');
+  },
 };
-const PIECES: Record<Color, Record<PieceType, { name: string; icon: string }>> = { w: army('w').pieces, b: army('b').pieces };
+const PIECES: Record<Color, Record<PieceType, { name: string; icon: string }>> = {
+  get w() {
+    return army('w').pieces;
+  },
+  get b() {
+    return army('b').pieces;
+  },
+};
 
 const VALUES: Record<PieceType, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const LEVELS: { id: Level; label: string; hint: string }[] = [
@@ -75,6 +88,46 @@ const facVars = (c: Color): string =>
   `--fac:${FACTIONS[c].primary};--fac2:${FACTIONS[c].secondary};--facl:${LABEL[c]}`;
 
 const other = (c: Color): Color => (c === 'w' ? 'b' : 'w');
+
+/** What an army card in the menu shows. */
+interface ArmyCard {
+  name: string;
+  icon: string;
+  portrait: string | null;
+  primary: string;
+  secondary: string;
+  shadow: boolean;
+}
+
+const armyCard = (a: Army | Pack): ArmyCard => ({
+  name: a.name,
+  icon: a.pieces.k.icon,
+  portrait: a.portrait,
+  primary: a.colors.primary,
+  secondary: a.colors.secondary,
+  shadow: 'shadow' in a && a.shadow,
+});
+
+const RECENT_KEY = 'battlecore.armies.recent.v1';
+const RECENT_MAX = 4;
+
+/** Armies picked lately, newest first (only ones that still exist). */
+function recentArmies(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as unknown;
+    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string' && id in PACKS).slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberArmy(id: string): void {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...recentArmies().filter((x) => x !== id)].slice(0, RECENT_MAX)));
+  } catch {
+    /* storage unavailable: no recents this visit */
+  }
+}
 
 // ---------------------------------------------------------------------------
 // DOM helpers
@@ -152,6 +205,10 @@ interface Saved {
   mode: 'ai' | 'local' | 'online' | 'learn';
   /** Training: the lesson picked in the menu. */
   learnLesson: string;
+  /** Armies for vs Computer, Local and Training. */
+  matchup: Matchup;
+  /** Online: the army this player brings. */
+  onlineArmy: string;
   humanColor: Color;
   level: Level;
   autoRotate: boolean;
@@ -165,6 +222,8 @@ interface Saved {
 const DEFAULTS: Saved = {
   mode: 'ai',
   learnLesson: LESSONS[0].id,
+  matchup: { w: 'babies', b: 'dinos' },
+  onlineArmy: 'babies',
   humanColor: 'w',
   level: 'medium',
   autoRotate: true,
@@ -183,6 +242,8 @@ function loadSaved(): Saved {
     return {
       mode: p.mode === 'local' || p.mode === 'online' || p.mode === 'learn' ? p.mode : 'ai',
       learnLesson: LESSONS.some((l) => l.id === p.learnLesson) ? (p.learnLesson as string) : DEFAULTS.learnLesson,
+      matchup: validMatchup(p.matchup),
+      onlineArmy: typeof p.onlineArmy === 'string' && PACKS[p.onlineArmy] ? p.onlineArmy : DEFAULTS.onlineArmy,
       humanColor: p.humanColor === 'b' ? 'b' : 'w',
       level: LEVELS.some((l) => l.id === p.level) ? (p.level as Level) : DEFAULTS.level,
       autoRotate: typeof p.autoRotate === 'boolean' ? p.autoRotate : DEFAULTS.autoRotate,
@@ -305,18 +366,26 @@ export function createHud(root: HTMLElement): Hud {
   audio.onChange(syncMute);
 
   // ----- Side panel -----
-  const trays: Record<Color, { list: HTMLElement; adv: HTMLElement }> = {
-    w: { list: el('div', 'bc-tray__list'), adv: el('span', 'bc-tray__adv') },
-    b: { list: el('div', 'bc-tray__list'), adv: el('span', 'bc-tray__adv') },
+  const trays: Record<Color, { list: HTMLElement; adv: HTMLElement; name: HTMLElement; box?: HTMLElement }> = {
+    w: { list: el('div', 'bc-tray__list'), adv: el('span', 'bc-tray__adv'), name: el('span', 'bc-tray__name') },
+    b: { list: el('div', 'bc-tray__list'), adv: el('span', 'bc-tray__adv'), name: el('span', 'bc-tray__name') },
   };
   const makeTray = (c: Color): HTMLElement =>
-    el(
+    (trays[c].box = el(
       'div',
       `bc-tray bc-tray--${c}`,
-      { style: facVars(c) },
-      el('div', 'bc-tray__head', undefined, el('span', 'bc-tray__name', undefined, FACTIONS[c].short), trays[c].adv),
+      undefined,
+      el('div', 'bc-tray__head', undefined, trays[c].name, trays[c].adv),
       trays[c].list,
-    );
+    ));
+  /** Army names and colors on the panel follow the armies in play. */
+  const syncArmies = (): void => {
+    for (const c of ['w', 'b'] as Color[]) {
+      trays[c].name.textContent = FACTIONS[c].short;
+      trays[c].box?.setAttribute('style', facVars(c));
+    }
+  };
+  onMatchupChange(syncArmies);
 
   const movesList = el('ol', 'bc-moves__list', { 'aria-label': 'Move list' });
   const movesEmpty = el('p', 'bc-moves__empty', undefined, 'No moves yet. Hold the line!');
@@ -500,6 +569,78 @@ export function createHud(root: HTMLElement): Hud {
       if (next.top === insets.top && next.right === insets.right && next.bottom === insets.bottom && next.left === insets.left) return;
       insets = next;
       for (const cb of insetCbs) cb(insets);
+    });
+  }
+
+  /**
+   * The army picker: a grid of army portraits (recent ones first) plus Random. Resolves with the picked pack id,
+   * or null if closed. `otherSide` is the army on the other side, so picking the same one can say it's a mirror.
+   */
+  function pickArmy(title: string, current: string, otherSide: string | null): Promise<string | null> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (id: string | null): void => {
+        if (done) return;
+        done = true;
+        document.removeEventListener('keydown', onKey, true);
+        close();
+        if (id) rememberArmy(id);
+        resolve(id);
+      };
+      const onKey = (e: KeyboardEvent): void => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        finish(null);
+      };
+      const tile = (p: Pack): HTMLButtonElement => {
+        const card = armyCard(p);
+        const mirror = otherSide === p.id;
+        return button(
+          'bc-army-tile',
+          [
+            el(
+              'span',
+              'bc-army-tile__portrait',
+              undefined,
+              card.portrait ? el('img', 'bc-army-tile__img', { src: card.portrait, alt: '', loading: 'lazy' }) : el('span', 'bc-army-tile__icon', { 'aria-hidden': 'true' }, card.icon),
+            ),
+            el('span', 'bc-army-tile__name', undefined, p.name),
+            el('span', 'bc-army-tile__sub', undefined, mirror ? 'Mirror match: Black plays its Shadow army' : (p.tagline ?? `${p.pieces.k.name} leads`)),
+          ],
+          () => finish(p.id),
+          {
+            'aria-pressed': String(p.id === current),
+            style: `--fac:${card.primary};--fac2:${card.secondary}`,
+            'data-autofocus': p.id === current,
+          },
+        );
+      };
+      const recent = recentArmies().filter((id) => PACK_LIST.length > RECENT_MAX && id in PACKS);
+      const random = button(
+        'bc-army-tile bc-army-tile--random',
+        [el('span', 'bc-army-tile__portrait', undefined, el('span', 'bc-army-tile__icon', { 'aria-hidden': 'true' }, '🎲')), el('span', 'bc-army-tile__name', undefined, 'Random'), el('span', 'bc-army-tile__sub', undefined, 'Surprise me')],
+        () => finish(PACK_LIST[Math.floor(Math.random() * PACK_LIST.length)].id),
+      );
+      const node = el(
+        'div',
+        'bc-dialog bc-army-sheet',
+        undefined,
+        button('bc-guide__close', '✕', () => finish(null), { 'aria-label': 'Close' }),
+        el('h2', 'bc-army-sheet__title', undefined, title),
+        el(
+          'div',
+          'bc-army-sheet__body',
+          undefined,
+          ...(recent.length
+            ? [el('div', 'bc-army-sheet__label', undefined, 'Recent'), el('div', 'bc-army-grid', undefined, ...recent.map((id) => tile(PACKS[id])))]
+            : []),
+          el('div', 'bc-army-sheet__label', undefined, `All armies (${PACK_LIST.length})`),
+          el('div', 'bc-army-grid', undefined, ...PACK_LIST.map(tile), random),
+        ),
+      );
+      document.addEventListener('keydown', onKey, true);
+      const close = openModal(node, title);
     });
   }
 
@@ -716,9 +857,68 @@ export function createHud(root: HTMLElement): Hud {
       state.onlineAction = 'join';
       joinCode = urlRoom;
     }
+    const forced = urlMatchup();
+    if (forced) state.matchup = forced;
     setHudHidden(true);
 
     return new Promise<MenuChoice>((resolve) => {
+      // Armies: a face-off of two portraits; "Change" opens the army picker sheet.
+      const armySlot = (title: () => string, onPick: () => void): { btn: HTMLButtonElement; set: (a: ArmyCard) => void } => {
+        const img = el('img', 'bc-army-slot__img', { alt: '' });
+        const icon = el('span', 'bc-army-slot__icon', { 'aria-hidden': 'true' });
+        const name = el('span', 'bc-army-slot__name');
+        const sub = el('span', 'bc-army-slot__sub');
+        const btn = button(
+          'bc-army-slot',
+          [el('span', 'bc-army-slot__portrait', undefined, img, icon), name, sub, el('span', 'bc-army-slot__change', { 'aria-hidden': 'true' }, 'Change')],
+          onPick,
+        );
+        return {
+          btn,
+          set: (a) => {
+            img.hidden = !a.portrait;
+            if (a.portrait) img.src = a.portrait;
+            icon.textContent = a.portrait ? '' : a.icon;
+            name.textContent = a.name;
+            sub.textContent = title();
+            btn.setAttribute('aria-label', `${title()}: ${a.name}. Change army`);
+            btn.style.cssText = `--fac:${a.primary};--fac2:${a.secondary}`;
+            btn.classList.toggle('is-shadow', a.shadow);
+          },
+        };
+      };
+      const slots: Record<Color, ReturnType<typeof armySlot>> = {
+        w: armySlot(() => 'White · moves first', () => void pickFor('w')),
+        b: armySlot(() => 'Black', () => void pickFor('b')),
+      };
+      const swapBtn = button('bc-matchup__swap', '⇄ Swap', () => {
+        state.matchup = { w: state.matchup.b, b: state.matchup.w };
+        sync();
+      }, { title: 'Swap which army plays white' });
+      const matchupField = el(
+        'div',
+        'bc-field',
+        undefined,
+        el('div', 'bc-field__label', undefined, 'Choose your armies'),
+        el('div', 'bc-matchup', undefined, slots.w.btn, el('div', 'bc-matchup__mid', undefined, el('span', 'bc-matchup__vs', { 'aria-hidden': 'true' }, 'VS'), swapBtn), slots.b.btn),
+      );
+      const onlineSlot = armySlot(() => 'Your army', () => void pickOnline());
+
+      async function pickFor(c: Color): Promise<void> {
+        const other: Color = c === 'w' ? 'b' : 'w';
+        const id = await pickArmy(c === 'w' ? 'Pick the White army' : 'Pick the Black army', state.matchup[c], state.matchup[other]);
+        if (!id) return;
+        state.matchup = { ...state.matchup, [c]: id };
+        sync();
+      }
+
+      async function pickOnline(): Promise<void> {
+        const id = await pickArmy('Pick your army', state.onlineArmy, null);
+        if (!id) return;
+        state.onlineArmy = id;
+        sync();
+      }
+
       // Mode cards
       const modeCard = (id: Saved['mode'], title: string, desc: string, badge: string): HTMLButtonElement =>
         button(
@@ -782,20 +982,20 @@ export function createHud(root: HTMLElement): Hud {
         sideBtns[c] = button(
           `bc-side bc-side--${c}`,
           [
-            el('span', 'bc-side__icon', { 'aria-hidden': 'true' }, PIECES[c].k.icon),
+            el('span', 'bc-side__icon', { 'aria-hidden': 'true' }, GLYPHS.k),
             el(
               'span',
               'bc-side__text',
               undefined,
-              el('span', 'bc-side__name', undefined, FACTIONS[c].name),
-              el('span', 'bc-side__sub', undefined, c === 'w' ? 'White · moves first' : 'Black · moves second'),
+              el('span', 'bc-side__name', undefined, c === 'w' ? 'Play White' : 'Play Black'),
+              el('span', 'bc-side__sub'),
             ),
           ],
           () => {
             state.humanColor = c;
             sync();
           },
-          { 'aria-pressed': 'false', style: facVars(c) },
+          { 'aria-pressed': 'false' },
         );
       }
 
@@ -815,7 +1015,7 @@ export function createHud(root: HTMLElement): Hud {
         'div',
         'bc-options',
         undefined,
-        el('div', 'bc-field', undefined, el('div', 'bc-field__label', undefined, 'Choose your army'), el('div', 'bc-sides', undefined, sideBtns.w, sideBtns.b)),
+        el('div', 'bc-field', undefined, el('div', 'bc-field__label', undefined, 'You command'), el('div', 'bc-sides', undefined, sideBtns.w, sideBtns.b)),
         el('div', 'bc-field', undefined, el('div', 'bc-field__label', undefined, 'Difficulty'), el('div', 'bc-seg', { role: 'group', 'aria-label': 'Difficulty' }, ...levelBtns)),
       );
 
@@ -932,12 +1132,12 @@ export function createHud(root: HTMLElement): Hud {
         return button(
           `bc-side bc-side--${c}`,
           [
-            el('span', 'bc-side__icon', { 'aria-hidden': 'true' }, isRandom ? '🎲' : PIECES[c].k.icon),
+            el('span', 'bc-side__icon', { 'aria-hidden': 'true' }, isRandom ? '🎲' : c === 'w' ? '♔' : GLYPHS.k),
             el(
               'span',
               'bc-side__text',
               undefined,
-              el('span', 'bc-side__name', undefined, isRandom ? 'Random' : FACTIONS[c].name),
+              el('span', 'bc-side__name', undefined, isRandom ? 'Random' : c === 'w' ? 'White' : 'Black'),
               el('span', 'bc-side__sub', undefined, isRandom ? 'HQ assigns sides' : c === 'w' ? 'Moves first' : 'Moves second'),
             ),
           ],
@@ -948,7 +1148,7 @@ export function createHud(root: HTMLElement): Hud {
           {
             'aria-pressed': 'false',
             'data-side': c,
-            style: isRandom ? '--fac:#6b5531;--fac2:#f39a3c;--facl:#f4ead2' : facVars(c),
+            style: isRandom ? '--fac:#6b5531;--fac2:#f39a3c;--facl:#f4ead2' : c === 'w' ? '--fac:#8a7a55;--fac2:#e8dcc0;--facl:#f4ead2' : '--fac:#3b3127;--fac2:#8f866f;--facl:#f4ead2',
           },
         );
       });
@@ -1012,7 +1212,7 @@ export function createHud(root: HTMLElement): Hud {
         'div',
         'bc-field',
         undefined,
-        el('div', 'bc-field__label', undefined, 'Choose your army'),
+        el('div', 'bc-field__label', undefined, 'Your side'),
         el('div', 'bc-sides bc-sides--3', undefined, ...onlineSideBtns),
       );
       const joinPane = el(
@@ -1028,6 +1228,7 @@ export function createHud(root: HTMLElement): Hud {
         'bc-options',
         undefined,
         el('div', 'bc-seg bc-seg--2', { role: 'group', 'aria-label': 'Online game' }, ...actionBtns),
+        el('div', 'bc-field', undefined, el('div', 'bc-field__label', undefined, 'Your army'), el('div', 'bc-matchup bc-matchup--solo', undefined, onlineSlot.btn)),
         namePane,
         createPane,
         joinPane,
@@ -1042,15 +1243,16 @@ export function createHud(root: HTMLElement): Hud {
         save(state);
         let choice: MenuChoice;
         const fights = state.fights;
-        if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false, fights };
-        else if (state.mode === 'learn') choice = { mode: 'learn', lesson: state.learnLesson, autoRotate: false, fights };
-        else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate, fights };
+        const matchup = { ...state.matchup };
+        if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false, fights, matchup };
+        else if (state.mode === 'learn') choice = { mode: 'learn', lesson: state.learnLesson, autoRotate: false, fights, matchup };
+        else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate, fights, matchup };
         else {
           const name = state.playerName;
           const online: OnlineRequest =
             state.onlineAction === 'join'
-              ? { action: 'join', code: joinCode, name }
-              : { action: 'create', side: state.onlineSide, name };
+              ? { action: 'join', code: joinCode, name, army: state.onlineArmy }
+              : { action: 'create', side: state.onlineSide, name, army: state.onlineArmy };
           choice = { mode: 'online', autoRotate: false, fights, online };
         }
         close();
@@ -1062,6 +1264,7 @@ export function createHud(root: HTMLElement): Hud {
         'bc-menu__card',
         undefined,
         el('div', 'bc-modes', { role: 'group', 'aria-label': 'Game mode' }, aiCard, localCard, onlineCard, learnCard),
+        matchupField,
         aiOptions,
         learnOptions,
         localOptions,
@@ -1073,6 +1276,9 @@ export function createHud(root: HTMLElement): Hud {
         el('div', 'bc-menu__links', undefined, button('bc-credits-link', 'How to play', () => void showGuide()), creditsBtn),
       );
 
+      const subW = el('span', 'bc-subtitle__w');
+      const subB = el('span', 'bc-subtitle__b');
+      const subtitle = el('p', 'bc-subtitle', undefined, subW, ' vs ', subB);
       const menu = el(
         'div',
         'bc-menu',
@@ -1082,7 +1288,7 @@ export function createHud(root: HTMLElement): Hud {
           'bc-menu__head',
           undefined,
           el('h1', 'bc-title', { id: 'bc-menu-title' }, 'BattleCore'),
-          el('p', 'bc-subtitle', undefined, el('span', 'bc-subtitle__w', undefined, FACTIONS.w.name), ' vs ', el('span', 'bc-subtitle__b', undefined, FACTIONS.b.name)),
+          subtitle,
         ),
         card,
       );
@@ -1113,6 +1319,19 @@ export function createHud(root: HTMLElement): Hud {
         codeHint.classList.toggle('is-ready', n === CODE_LEN);
         deployBtn.disabled = !canDeploy();
         for (const c of ['w', 'b'] as Color[]) sideBtns[c].setAttribute('aria-pressed', String(state.humanColor === c));
+        // Armies: the face-off, the vs Computer side cards and the title follow the draft matchup.
+        const draft = armiesFor(state.matchup);
+        for (const c of ['w', 'b'] as Color[]) {
+          slots[c].set(armyCard(draft[c]));
+          const sub = sideBtns[c].querySelector('.bc-side__sub');
+          if (sub) sub.textContent = draft[c].name;
+          sideBtns[c].setAttribute('style', `--fac:${draft[c].colors.primary};--fac2:${draft[c].colors.secondary};--facl:${LABEL[c]}`);
+        }
+        onlineSlot.set(armyCard(PACKS[state.onlineArmy]));
+        const online = state.mode === 'online';
+        matchupField.hidden = online;
+        subW.textContent = online ? PACKS[state.onlineArmy].name : draft.w.name;
+        subB.textContent = online ? 'the world' : draft.b.name;
         for (const b of levelBtns) b.setAttribute('aria-pressed', String(b.dataset.level === state.level));
         rotateInput.checked = state.autoRotate;
         for (const b of fightBtns) b.setAttribute('aria-pressed', String(b.dataset.fights === state.fights));
@@ -1560,6 +1779,7 @@ export function createHud(root: HTMLElement): Hud {
   insetWatch.observe(topBar);
 
   // Initial state
+  syncArmies();
   setTurn('w');
   setMoves([]);
   setCaptured([], []);

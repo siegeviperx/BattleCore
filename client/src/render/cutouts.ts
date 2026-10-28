@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Color, PieceType } from '../core/types';
-import { GLYPHS, army, lookCount, pieceInfo, pieceLook } from '../packs';
+import { GLYPHS, SHADOW_SHADE, army, lookCount, pieceInfo, pieceLook } from '../packs';
 
 /** Logical canvas size (drawn at 2× for crispness). */
 const W = 256;
@@ -26,7 +26,7 @@ export interface Cutout {
 const cache = new Map<string, Cutout>();
 
 export function getCutout(color: Color, type: PieceType, look = 0): Cutout {
-  const key = `${color}-${type}-${look % lookCount(color, type)}`;
+  const key = `${army(color).key}-${type}-${look % lookCount(color, type)}`;
   let c = cache.get(key);
   if (!c) {
     c = drawCutout(color, type, look);
@@ -162,6 +162,7 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
   ctx.fillText(label, W / 2, bannerY + bannerH / 2 + 1);
   ctx.restore();
 
+  if (army(color).shadow) darken(ctx);
   drawGlyphBadge(ctx, color, glyph, ix + 26, iy + 26, 1);
 
   const texture = new THREE.CanvasTexture(cv);
@@ -176,6 +177,7 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
     img.onload = () => {
       ctx.clearRect(0, 0, W, H);
       ctx.drawImage(img, 0, 0, W, H);
+      if (army(color).shadow) darken(ctx);
       drawGlyphBadge(ctx, color, glyph, 30, 30, 0.8);
       texture.needsUpdate = true;
       Object.assign(cutout, buildMask(ctx, cv));
@@ -183,6 +185,15 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
     img.src = art;
   }
   return cutout;
+}
+
+/** Mirror matches: the second army's sticker is drawn darker (border included) so the sides stay apart. */
+function darken(ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = `rgba(34, 12, 58, ${1 - SHADOW_SHADE + 0.1})`; // dark purple, matching the shadow bases
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
 }
 
 /** Chess glyph corner badge, so chess players always recognise the role. */
@@ -236,9 +247,9 @@ function buildMask(ctx: CanvasRenderingContext2D, cv: HTMLCanvasElement): Omit<C
 }
 
 /** Top-cap texture for a faction base: base colour + white emblem. */
-const baseCache = new Map<Color, THREE.CanvasTexture>();
+const baseCache = new Map<string, THREE.CanvasTexture>();
 export function getBaseTopTexture(color: Color): THREE.CanvasTexture {
-  let t = baseCache.get(color);
+  let t = baseCache.get(army(color).key);
   if (t) return t;
   const f = { ...army(color).colors, baseEmblem: army(color).colors.emblem };
   const S = 256;
@@ -292,6 +303,6 @@ export function getBaseTopTexture(color: Color): THREE.CanvasTexture {
   t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
-  baseCache.set(color, t);
+  baseCache.set(army(color).key, t);
   return t;
 }

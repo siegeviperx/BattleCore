@@ -20,14 +20,14 @@ baseGeo.translate(0, BASE_H / 2, 0);
 const rimGeo = new THREE.TorusGeometry((BASE_R_TOP + BASE_R_BOTTOM) / 2 + 0.006, 0.012, 6, 40).rotateX(Math.PI / 2);
 const cutoutGeo = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
 
-const baseMats = new Map<Color, THREE.Material[]>();
+const baseMats = new Map<string, THREE.Material[]>();
 function getBaseMaterials(color: Color): THREE.Material[] {
-  let m = baseMats.get(color);
+  let m = baseMats.get(army(color).key);
   if (!m) {
     const side = new THREE.MeshStandardMaterial({ color: army(color).colors.base, roughness: 0.42, metalness: 0.25 });
     const top = new THREE.MeshStandardMaterial({ map: getBaseTopTexture(color), roughness: 0.38, metalness: 0.15 });
     m = [side, top, side];
-    baseMats.set(color, m);
+    baseMats.set(army(color).key, m);
   }
   return m;
 }

@@ -153,6 +153,11 @@ The current intro is built around the Giant Baby and the Baby Dino. It becomes:
 
 ### 3.7 Online play
 
+> **Status: built.** Protocol v2: `create`/`join` carry `army`, snapshots carry `armies` (by side, following the
+> players on rematch). Unknown ids fall back to the defaults. The menu's army picker (face-off + picker sheet,
+> recent armies, Random, mirror matches as a darker purple "Shadow" army) is in `client/src/ui/index.ts`.
+> The intro plays only for Babies vs Dinos.
+
 - `create` carries the host's two pack IDs. The joining player's client downloads any pack it doesn't
   already have before the game starts. Packs are static files on Netlify, so this needs no new hosting.
 - `PROTOCOL_VERSION` goes to 2. Old clients are refused with `bad-version`, as they are today.

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Color, PieceType } from '../core/types';
-import { PIECE_TYPES, lookCount, pieceLook, type LookTuning } from '../packs';
+import { PACKS, PIECE_TYPES, SHADOW_SHADE, army, lookCount, pieceLook, type LookTuning } from '../packs';
 import { gltfLoader } from '../render/gltf';
 
 /** Pack tuning with the defaults filled in. */
@@ -21,32 +21,36 @@ export interface FighterModel {
   clips: Partial<Record<ClipName, THREE.AnimationClip>>;
 }
 
-const lookId = (color: Color, type: PieceType, look: number): string => `${color}-${type}-${look}`;
+/** Models are cached per pack, so a mirror match's two armies share them. */
+const lookId = (pack: string, type: PieceType, look: number): string => `${pack}-${type}-${look}`;
 const cache = new Map<string, { scene: THREE.Object3D; animations: THREE.AnimationClip[] }>();
-let loading: Promise<void> | null = null;
+const packLoads = new Map<string, Promise<void>>();
 
-/** Start downloading every fighter model; resolves once each one has loaded or failed. */
-export function preloadFighterModels(): Promise<void> {
-  if (loading) return loading;
+/** Download one pack's fighter models (once); resolves when each has loaded or failed. */
+function preloadPack(id: string): Promise<void> {
+  let p = packLoads.get(id);
+  if (p) return p;
   const loader = gltfLoader();
   const jobs: Promise<void>[] = [];
-  for (const c of ['w', 'b'] as Color[]) {
-    for (const t of PIECE_TYPES) {
-      for (let look = 0; look < lookCount(c, t); look++) {
-        const url = pieceLook(c, t, look).model;
-        if (!url) continue; // no model in the pack: the toy stands in
-        const key = lookId(c, t, look);
-        jobs.push(
-          loader
-            .loadAsync(url)
-            .then((gltf) => void cache.set(key, gltf))
-            .catch(() => {}), // failed to load: the toy stands in
-        );
-      }
-    }
+  for (const t of PIECE_TYPES) {
+    PACKS[id].pieces[t].looks.forEach((look, i) => {
+      if (!look.model) return; // no model in the pack: the toy stands in
+      jobs.push(
+        loader
+          .loadAsync(look.model)
+          .then((gltf) => void cache.set(lookId(id, t, i), gltf))
+          .catch(() => {}), // failed to load: the toy stands in
+      );
+    });
   }
-  loading = Promise.all(jobs).then(() => {});
-  return loading;
+  p = Promise.all(jobs).then(() => {});
+  packLoads.set(id, p);
+  return p;
+}
+
+/** Start downloading the fighter models of both armies in play; resolves once each has loaded or failed. */
+export function preloadFighterModels(): Promise<void> {
+  return Promise.all([preloadPack(army('w').id), preloadPack(army('b').id)]).then(() => {});
 }
 
 /** Every fighter model that has loaded so far (for warming up the GPU before the first fight). */
@@ -60,12 +64,14 @@ export function modelTuning(color: Color, type: PieceType, look = 0): ModelTunin
 
 /** A fresh copy with its own materials (so hit flashes don't leak) and its clips, or null if not loaded. */
 export function cloneFighterModel(color: Color, type: PieceType, look = 0): FighterModel | null {
-  const src = cache.get(lookId(color, type, look % lookCount(color, type)));
+  const src = cache.get(lookId(army(color).id, type, look % lookCount(color, type)));
   if (!src) return null;
   const copy = cloneSkinned(src.scene);
+  const shadow = army(color).shadow; // mirror match: the second army fights darker too
   copy.traverse((o) => {
     if (o instanceof THREE.Mesh) {
       o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+      if (shadow) for (const m of [o.material].flat()) (m as THREE.MeshStandardMaterial).color?.multiplyScalar(SHADOW_SHADE);
       o.castShadow = true;
     }
   });

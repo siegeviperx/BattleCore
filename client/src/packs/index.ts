@@ -16,27 +16,100 @@ export const PACKS: Record<string, Pack> = Object.fromEntries(
   }),
 );
 
-/** Which pack plays each side. The original matchup until the menu gets an army picker. */
+/** Which pack plays each side when nobody has chosen. */
 export const DEFAULT_MATCHUP: Matchup = { w: 'babies', b: 'dinos' };
 
-/** Dev builds only: `?white=<pack>&black=<pack>` swaps the armies (used by `npm run pack:preview`). */
-function startingMatchup(): Matchup {
-  const m = { ...DEFAULT_MATCHUP };
-  if (import.meta.env.DEV && typeof location !== 'undefined') {
-    const q = new URLSearchParams(location.search);
-    for (const [c, key] of [['w', 'white'], ['b', 'black']] as const) {
-      const id = q.get(key);
-      if (id && PACKS[id]) m[c] = id;
-      else if (id) console.warn(`No pack "${id}"; packs: ${Object.keys(PACKS).join(', ')}`);
-    }
-  }
-  return m;
+/** Packs in picker order: the original two first, then by name. */
+export const PACK_LIST: Pack[] = Object.values(PACKS).sort((a, b) => {
+  const rank = (p: Pack) => ['babies', 'dinos'].indexOf(p.id) + 1 || 3;
+  return rank(a) - rank(b) || a.name.localeCompare(b.name);
+});
+
+/** A matchup with unknown or missing pack ids replaced by the defaults (e.g. from an old save or a newer friend). */
+export function validMatchup(m: Partial<Record<Color, string | null>> | null | undefined): Matchup {
+  return {
+    w: m?.w && PACKS[m.w] ? m.w : DEFAULT_MATCHUP.w,
+    b: m?.b && PACKS[m.b] ? m.b : DEFAULT_MATCHUP.b,
+  };
 }
 
-const matchup = startingMatchup();
+/** Dev builds only: `?white=<pack>&black=<pack>` picks the armies (used by `npm run pack:preview`). */
+export function urlMatchup(): Matchup | null {
+  if (!import.meta.env.DEV || typeof location === 'undefined') return null;
+  const q = new URLSearchParams(location.search);
+  if (!q.has('white') && !q.has('black')) return null;
+  for (const id of [q.get('white'), q.get('black')]) {
+    if (id && !PACKS[id]) console.warn(`No pack "${id}"; packs: ${Object.keys(PACKS).join(', ')}`);
+  }
+  return validMatchup({ w: q.get('white'), b: q.get('black') });
+}
 
-export function army(color: Color): Pack {
-  return PACKS[matchup[color]];
+/** The army one side fields: its pack, or for the second army of a mirror match, a darker "Shadow" copy. */
+export interface Army extends Pack {
+  /** Mirror match, black side: stickers, models and bases are drawn darker so the sides stay apart. */
+  shadow: boolean;
+  /** Cache key: differs between a pack and its shadow. */
+  key: string;
+}
+
+/** How much darker a shadow army is drawn (multiplier on its colors and models). */
+export const SHADOW_SHADE = 0.55;
+/** Shadow armies stand on deep purple bases, so the sides read apart even from across the board. */
+export const SHADOW_BASE = '#3a1d5c';
+
+let matchup: Matchup = urlMatchup() ?? { ...DEFAULT_MATCHUP };
+let armies = buildArmies(matchup);
+const listeners: (() => void)[] = [];
+
+function buildArmies(m: Matchup): Record<Color, Army> {
+  const w = PACKS[m.w];
+  const b = PACKS[m.b];
+  const shadow = m.w === m.b;
+  return {
+    w: { ...w, shadow: false, key: w.id },
+    b: shadow
+      ? {
+          ...b,
+          name: `Shadow ${b.name}`,
+          short: `Shadow ${b.short}`,
+          colors: { ...b.colors, primary: shade(b.colors.primary), secondary: shade(b.colors.secondary), base: SHADOW_BASE },
+          shadow: true,
+          key: `${b.id}~shadow`,
+        }
+      : { ...b, shadow: false, key: b.id },
+  };
+}
+
+function shade(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v: number) => Math.round(v * SHADOW_SHADE).toString(16).padStart(2, '0');
+  return `#${ch(n >> 16)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
+}
+
+/** The armies a matchup would field (shadow naming included), without switching to it. For the menu. */
+export function armiesFor(m: Partial<Record<Color, string | null>>): Record<Color, Army> {
+  return buildArmies(validMatchup(m));
+}
+
+export function getMatchup(): Matchup {
+  return { ...matchup };
+}
+
+/** Switch armies (before a new game). Unknown ids fall back to the defaults. */
+export function setMatchup(m: Partial<Record<Color, string | null>>): void {
+  const next = validMatchup(m);
+  if (next.w === matchup.w && next.b === matchup.b) return;
+  matchup = next;
+  armies = buildArmies(next);
+  for (const cb of listeners) cb();
+}
+
+export function onMatchupChange(cb: () => void): void {
+  listeners.push(cb);
+}
+
+export function army(color: Color): Army {
+  return armies[color];
 }
 
 export function pieceInfo(color: Color, type: PieceType): PackPiece {

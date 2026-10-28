@@ -48,11 +48,19 @@ export interface Pack {
   short: string;
   colors: { primary: string; secondary: string; base: string; emblem: string };
   credits: { role: string; name: string; url?: string; note?: string }[];
+  /** One short line for the army picker, e.g. "Fire-breathing fantasy". */
+  tagline?: string;
+  /** For grouping the army picker later (Fantasy, Animals, Myths…). */
+  group?: string;
+  /** Resolved URL of the picker portrait: `portrait` from pack.json, else the king's sticker (null: none yet). */
+  portrait: string | null;
   pieces: Record<PieceType, PackPiece>;
 }
 
 /** pack.json as written: paths are relative to the pack folder. */
-export interface PackFile extends Omit<Pack, 'pieces'> {
+export interface PackFile extends Omit<Pack, 'pieces' | 'portrait'> {
+  /** Picker portrait, e.g. "pieces/k.png"; defaults to the king's sticker. */
+  portrait?: string;
   pieces: Record<PieceType, Omit<PackPiece, 'looks'> & { looks: { art?: string; model?: string; tuning?: LookTuning }[] }>;
 }
 
@@ -103,5 +111,6 @@ export function loadPack(folder: string, file: PackFile, urls: Record<string, st
       })),
     };
   }
-  return { ...file, pieces };
+  const portrait = file.portrait ? url(file.portrait, 'portrait') : pieces.k.looks[0].art;
+  return { ...file, portrait, pieces };
 }

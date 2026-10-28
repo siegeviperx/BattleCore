@@ -27,6 +27,8 @@ export interface Peer {
 interface Player {
   side: Side;
   name: string | null;
+  /** Chosen army (pack id), or null for the client's default. Follows the player when sides swap. */
+  army: string | null;
   token: string;
   peer: Peer | null;
   graceTimer: ReturnType<typeof setTimeout> | null;
@@ -74,6 +76,10 @@ export class Room {
       drawOffered: opp !== null && this.drawOfferFrom === opp.side,
       youName: p.name,
       opponentName: opp?.name ?? null,
+      armies: {
+        w: this.players.find((x) => x.side === 'w')?.army ?? null,
+        b: this.players.find((x) => x.side === 'b')?.army ?? null,
+      },
     };
   }
 
@@ -106,9 +112,9 @@ export class RoomManager {
       case 'ping':
         return; // handled by the transport
       case 'create':
-        return this.create(peer, msg.side === 'random' ? (randomInt(2) ? 'w' : 'b') : msg.side, msg.name);
+        return this.create(peer, msg.side === 'random' ? (randomInt(2) ? 'w' : 'b') : msg.side, msg.name, msg.army);
       case 'join':
-        return this.join(peer, msg.code, msg.name);
+        return this.join(peer, msg.code, msg.name, msg.army);
       case 'resume':
         return this.resume(peer, msg.code, msg.token);
     }
@@ -154,22 +160,22 @@ export class RoomManager {
 
   // --- lobby ---------------------------------------------------------------
 
-  private create(peer: Peer, side: Side, name?: string): void {
+  private create(peer: Peer, side: Side, name?: string, army?: string): void {
     if (this.seats.has(peer)) return err(peer, 'bad-request', 'Already in a room');
     const room = new Room(this.newCode());
     this.rooms.set(room.code, room);
-    const player = this.addPlayer(room, peer, side, name);
+    const player = this.addPlayer(room, peer, side, name, army);
     peer.send({ t: 'seated', code: room.code, token: player.token, you: side });
     room.sendSnapshot(player);
   }
 
-  private join(peer: Peer, rawCode: string, name?: string): void {
+  private join(peer: Peer, rawCode: string, name?: string, army?: string): void {
     if (this.seats.has(peer)) return err(peer, 'bad-request', 'Already in a room');
     const room = this.rooms.get(normCode(rawCode));
     if (!room) return err(peer, 'room-not-found', 'No room with that code');
     const host = room.players[0];
     if (room.started || room.players.length !== 1 || !host) return err(peer, 'room-full', 'Room is full');
-    const player = this.addPlayer(room, peer, other(host.side), name);
+    const player = this.addPlayer(room, peer, other(host.side), name, army);
     room.started = true;
     peer.send({ t: 'seated', code: room.code, token: player.token, you: player.side });
     room.sendSnapshot(player);
@@ -282,10 +288,11 @@ export class RoomManager {
 
   // --- seats / lifecycle ---------------------------------------------------
 
-  private addPlayer(room: Room, peer: Peer, side: Side, name?: string): Player {
+  private addPlayer(room: Room, peer: Peer, side: Side, name?: string, army?: string): Player {
     const player: Player = {
       side,
       name: cleanName(name ?? '') || null,
+      army: army ?? null,
       token: randomBytes(24).toString('base64url'),
       peer,
       graceTimer: null,

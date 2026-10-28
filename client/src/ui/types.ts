@@ -1,11 +1,14 @@
 import type { Color, FightMode, Level, PieceType } from '../core/types';
+import type { Matchup } from '../packs/validate';
 
 export type OnlineRequest =
-  | { action: 'create'; side: Color | 'random'; name: string }
-  | { action: 'join'; code: string; name: string };
+  | { action: 'create'; side: Color | 'random'; name: string; army: string }
+  | { action: 'join'; code: string; name: string; army: string };
 
 export interface MenuChoice {
   mode: 'ai' | 'local' | 'online' | 'learn';
+  /** Which army (pack id) plays each side. Online games get theirs from the server instead. */
+  matchup?: Matchup;
   /** Training only: the lesson to start (core/lessons.ts id). */
   lesson?: string;
   /** vs Computer only: which side the human plays. */

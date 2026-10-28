@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ATTACKS, KNOCKOUTS } from '../fight/moves';
-import { PACKS, PIECE_TYPES, army, loadPack, parseSlot } from './index';
+import { PACKS, PACK_LIST, PIECE_TYPES, armiesFor, army, getMatchup, loadPack, onMatchupChange, parseSlot, setMatchup, validMatchup } from './index';
+import { lessonText } from '../core/lessons';
 
 describe('piece packs', () => {
-  it('ships the original matchup', () => {
+  it('starts with the original matchup', () => {
     expect(army('w').id).toBe('babies');
     expect(army('b').id).toBe('dinos');
   });
@@ -19,6 +20,39 @@ describe('piece packs', () => {
       }
     });
   }
+
+  it('lists the original two armies first in the picker', () => {
+    expect(PACK_LIST.slice(0, 2).map((p) => p.id)).toEqual(['babies', 'dinos']);
+    expect(PACK_LIST.map((p) => p.id)).toContain('dragons');
+    for (const p of PACK_LIST) expect(p.portrait).toBeTruthy();
+  });
+
+  it('falls back to the default armies for unknown or missing ids', () => {
+    expect(validMatchup({ w: 'dragons', b: 'nope' })).toEqual({ w: 'dragons', b: 'dinos' });
+    expect(validMatchup(null)).toEqual({ w: 'babies', b: 'dinos' });
+  });
+
+  it('a mirror match fields a darker Shadow army on the black side', () => {
+    const a = armiesFor({ w: 'dragons', b: 'dragons' });
+    expect(a.w.shadow).toBe(false);
+    expect(a.b.shadow).toBe(true);
+    expect(a.b.name).toBe('Shadow Dragon Clans');
+    expect(a.b.key).not.toBe(a.w.key);
+    expect(a.b.colors.primary).not.toBe(a.w.colors.primary);
+    expect(armiesFor({ w: 'dragons', b: 'dinos' }).b.shadow).toBe(false);
+  });
+
+  it('switching armies notifies listeners and renames lesson pieces', () => {
+    let calls = 0;
+    onMatchupChange(() => calls++);
+    setMatchup({ w: 'dragons', b: 'babies' });
+    expect(getMatchup()).toEqual({ w: 'dragons', b: 'babies' });
+    expect(army('w').id).toBe('dragons');
+    expect(lessonText('{w.k} and the {b} vs the {w.army}')).toBe('Elder Wyrm and the Babies vs the Dragon Clans');
+    setMatchup({ w: 'dragons', b: 'babies' }); // no change, no call
+    expect(calls).toBe(1);
+    setMatchup({ w: 'babies', b: 'dinos' });
+  });
 
   it('names look slots', () => {
     expect(parseSlot('k')).toEqual({ type: 'k', look: 0 });

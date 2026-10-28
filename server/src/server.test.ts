@@ -140,6 +140,36 @@ describe('lobby', () => {
     expect(await host.snapshot()).toMatchObject({ youName: 'Ada the Great', opponentName: 'Rex' });
   });
 
+  it("shares each player's army by side, and the armies follow the players on rematch", async () => {
+    const host = await Client.open(srv.port);
+    host.send({ t: 'create', side: 'w', army: 'dragons' });
+    const { code } = await host.next('seated');
+    expect((await host.snapshot()).armies).toEqual({ w: 'dragons', b: null });
+    const guest = await Client.open(srv.port);
+    guest.send({ t: 'join', code, army: 'dinos' });
+    await guest.next('seated');
+    expect((await guest.snapshot()).armies).toEqual({ w: 'dragons', b: 'dinos' });
+    await host.next('opponent');
+    expect((await host.snapshot()).armies).toEqual({ w: 'dragons', b: 'dinos' });
+    host.send({ t: 'resign' });
+    await host.next('gameOver');
+    await guest.next('gameOver');
+    host.send({ t: 'rematch' });
+    await guest.next('rematchOffered');
+    guest.send({ t: 'rematch' });
+    expect((await host.snapshot()).armies).toEqual({ w: 'dinos', b: 'dragons' });
+  });
+
+  it('army is optional; a malformed army id is rejected', async () => {
+    const { snapH } = await pair();
+    expect(snapH.armies).toEqual({ w: null, b: null });
+    for (const army of ['Dragons', '../x', 42, 'a'.repeat(40)]) {
+      const c = await Client.open(srv.port);
+      c.send({ t: 'create', side: 'w', army });
+      await c.error('bad-request');
+    }
+  });
+
   it('names are optional; a non-string name is rejected', async () => {
     const { snapH } = await pair();
     expect(snapH).toMatchObject({ youName: null, opponentName: null });

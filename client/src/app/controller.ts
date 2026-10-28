@@ -6,7 +6,7 @@ import { Game, type PlayedMove } from '../core/game';
 import { LESSON_GROUPS, lessonById, lessonText, markLessonDone, nextLesson, type Lesson } from '../core/lessons';
 import type { Color, MoveTarget, Square } from '../core/types';
 import { OnlineClient, type ConnectionState } from '../net/client';
-import { army } from '../packs';
+import { DEFAULT_MATCHUP, army, getMatchup, setMatchup } from '../packs';
 import type { BoardView } from '../render/types';
 import type { Hud, IntroMode, MenuChoice, OnlineRequest } from '../ui/types';
 
@@ -88,7 +88,10 @@ export class Controller {
 
   async start(): Promise<void> {
     // The intro cinematic opens the app (per the menu's intro setting, or ?intro=1 / ?intro=0), before the menu.
-    if (shouldPlayIntro(this.hud.introMode())) {
+    // The intro stars the Baby Army and the Dinos, so it only plays for that matchup (no generic intro yet).
+    const m = getMatchup();
+    const introArmies = m.w === DEFAULT_MATCHUP.w && m.b === DEFAULT_MATCHUP.b;
+    if (introArmies && shouldPlayIntro(this.hud.introMode())) {
       // Browsers only start audio after a tap or key press, so the intro waits behind a title card.
       const loaded = Promise.race([this.board.introReady(), new Promise<void>((r) => setTimeout(r, INTRO_LOAD_TIMEOUT_MS))]);
       await this.hud.showStart(loaded);
@@ -113,6 +116,7 @@ export class Controller {
     audio.music('menu');
     this.choice = await this.hud.showMenu();
     this.inMenu = false;
+    if (this.choice.matchup) setMatchup(this.choice.matchup); // online games take theirs from the server
     this.board.setFightMode(this.choice.fights);
     if (this.choice.mode === 'online' && this.choice.online) void this.startOnline(this.choice.online);
     else if (this.choice.mode === 'learn') void this.startLesson(this.choice.lesson ?? '');
@@ -505,7 +509,8 @@ export class Controller {
     }
     if (this.online !== session) return;
     const name = request.name || undefined;
-    net.send(request.action === 'create' ? { t: 'create', side: request.side, name } : { t: 'join', code: request.code, name });
+    const army = request.army || undefined;
+    net.send(request.action === 'create' ? { t: 'create', side: request.side, name, army } : { t: 'join', code: request.code, name, army });
   }
 
   private showLobby(session: OnlineSession, code: string | null): void {
@@ -585,6 +590,7 @@ export class Controller {
     this.closeLobby();
     this.animQueue = Promise.resolve();
     this.animating = false;
+    setMatchup(s.armies ?? {}); // both players see the same armies; unknown ones (a newer friend's pack) fall back
     this.game = new Game(s.startFen);
     for (const uci of s.moves) this.game.moveUci(uci);
     this.clearSelection();

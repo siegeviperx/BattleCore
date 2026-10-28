@@ -1,7 +1,7 @@
 // Training lessons (data/lessons.json): a start position, the move(s) the student should find, and scripted
 // replies. Text may name pieces with {w.n}-style tokens, filled in with the current army names.
 import data from '../data/lessons.json';
-import { pieceInfo } from '../packs';
+import { army, pieceInfo } from '../packs';
 import type { Color, PieceType } from './types';
 
 export interface LessonStep {
@@ -51,9 +51,15 @@ export function nextLesson(id: string): Lesson | undefined {
   return i >= 0 ? LESSONS[i + 1] : undefined;
 }
 
-/** Replace {w.n}-style tokens with the active armies' piece names, e.g. "{w.n}" -> "Jetpack Baby". */
+/**
+ * Fill in the active armies: "{w.n}" -> a piece name ("Jetpack Baby"), "{w}" -> the army's short name ("Babies"),
+ * "{w.army}" -> its full name ("Baby Army").
+ */
 export function lessonText(text: string): string {
-  return text.replace(/\{([wb])\.([pnbrqk])\}/g, (_, c: Color, t: PieceType) => pieceInfo(c, t).name);
+  return text
+    .replace(/\{([wb])\.([pnbrqk])\}/g, (_, c: Color, t: PieceType) => pieceInfo(c, t).name)
+    .replace(/\{([wb])\.army\}/g, (_, c: Color) => army(c).name)
+    .replace(/\{([wb])\}/g, (_, c: Color) => army(c).short);
 }
 
 // --- Progress (which lessons are complete), kept in localStorage ---

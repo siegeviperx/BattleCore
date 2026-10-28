@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { BoardPiece, Color, FightMode, MoveAnim, MoveTarget, Square } from '../core/types';
 import { IntroDirector, loadedIntroScenes } from '../cutscene/intro';
 import { FightDirector } from '../fight/director';
-import { loadedFighterScenes } from '../fight/models';
+import { loadedFighterScenes, preloadFighterModels } from '../fight/models';
+import { onMatchupChange } from '../packs';
 import type { BoardView } from './types';
 import { createScene } from './scene';
 import { createBoard } from './board';
@@ -97,6 +98,8 @@ class ThreeBoardView implements BoardView {
     this.pieces.setFightHandler((m, mover, victim) => this.fights.play(m, mover, victim));
     this.intro = new IntroDirector(scene, this.pieces, this.rig, this.pieceTw);
     this.warmed = this.intro.ready().then(() => this.warmUp());
+    // New armies: fetch their models and warm the GPU up for them too, so their first fight doesn't hitch.
+    onMatchupChange(() => void preloadFighterModels().then(() => this.warmUp()));
 
     this.resize();
     new ResizeObserver(() => this.resize()).observe(container);

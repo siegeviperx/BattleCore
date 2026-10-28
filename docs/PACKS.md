@@ -55,6 +55,12 @@ Then:
 - Put **1–5 reference images** in `art-source/packs/dragons/concept/`. Every piece is generated in their style.
   The Baby Army used `docs/concept/` paintings.
 - Open **`client/src/packs/dragons/pack.json`** and fill in real names and icons (any emoji). Fight moves can wait.
+- Optional, for the army picker: `"tagline": "Fire-breathing fantasy"` (one short line under the name) and
+  `"portrait": "pieces/q.png"` (which sticker to show; the king's by default). `"colors"."emblem"` is the mark on
+  the bases: `star` or `claw`.
+
+Players choose armies in the menu, so a merged pack shows up in the army picker on its own. It can fight any other
+pack, or itself: in a mirror match the black side is drawn as a darker, purple "Shadow" army.
 
 ## 3. Make the pieces, one at a time
 
