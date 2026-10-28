@@ -131,7 +131,8 @@
           "model": "models/p.glb"
         },
         {
-          "art": "pieces/p2.png"
+          "art": "pieces/p2.png",
+          "model": "models/p2.glb"
         },
         {
           "art": "pieces/p3.png",

@@ -44,8 +44,10 @@
   "p2": {
     "art": {
       "kind": "image-to-image",
-      "id": "01a18046-bf73-7598-8934-a54a90793be4"
-    }
+      "id": "01a1805a-bfd3-7776-ac21-1e9532de28d0"
+    },
+    "replaced_art_teal": "01a18046-bf73-7598-8934-a54a90793be4",
+    "model": "01a1805b-7c33-7481-aad3-42509afa6339"
   },
   "p3": {
     "art": {

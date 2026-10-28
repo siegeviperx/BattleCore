@@ -11,6 +11,6 @@ added in front of every prompt, and the images in `concept/` are the style refer
 | b | Wyvern Sage | a wise old teal wyvern standing on two legs in a hooded deep-teal robe with gold trim, holding a carved wooden toy staff topped with a glowing golden orb |
 | n | Wyvern Rider | an armored teal wyvern with gold armor plates and a little saddle, wings spread wide in flight, mounted on a clear plastic toy flight stand with a round base |
 | p | Hatchling (green) | a chubby baby dragon with bright green scales, wearing the top half of a cracked white eggshell as a helmet, holding a toy sparkler wand, standing |
-| p2 | Hatchling (blue) | a chubby baby dragon with bright blue scales, wearing the top half of a cracked white eggshell as a helmet, holding a toy sparkler wand, standing |
+| p2 | Hatchling (blue) | (redo; the first take came out teal) a chubby baby dragon whose scales are BRIGHT SKY-BLUE all over (a clear light blue like a summer sky, NOT teal, NOT green, NOT turquoise), with a pale cream belly, wearing the top half of a cracked white eggshell as a helmet, holding a toy sparkler wand, standing |
 | p3 | Hatchling (gold) | a chubby baby dragon with shiny gold-yellow scales, wearing the top half of a cracked white eggshell as a helmet, holding a toy sparkler wand, standing |
 | p4 | Hatchling (purple) | a chubby baby dragon with bright purple scales, wearing the top half of a cracked white eggshell as a helmet, holding a toy sparkler wand, standing |
