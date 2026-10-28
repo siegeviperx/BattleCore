@@ -1,0 +1,70 @@
+{
+  "pages": [
+    {
+      "title": "The Goal",
+      "paras": [
+        "Chess is a battle between two armies of 16 pieces. The {w.k} leads the Baby Army (white) and the {b.k} leads the Armored Dinos (black).",
+        "You win by **checkmate**: trapping the enemy king so it is attacked and has no way to escape.",
+        "White moves first, then players take turns, one move each. To **capture**, move onto a square holding an enemy piece. The two pieces fight it out, and yours takes the square."
+      ]
+    },
+    {
+      "title": "The Pieces",
+      "paras": ["Each army has 8 pawns, 2 knights, 2 bishops, 2 rooks, a queen and a king. Only knights can jump over other pieces."],
+      "pieces": true
+    },
+    {
+      "title": "Special Moves",
+      "paras": [
+        "**Castling.** Your king steps two squares toward a rook, and the rook hops to the king's other side. You may castle only if neither piece has moved, the squares between them are empty, and your king is not in check, passing through danger, or landing in danger.",
+        "**Promotion.** A pawn that reaches the far end of the board becomes a queen, rook, bishop or knight. Most players choose the queen.",
+        "**En passant.** If an enemy pawn charges two squares and lands right beside your pawn, your pawn may capture it as if it had moved one square. This only works on the very next move."
+      ]
+    },
+    {
+      "title": "Check & Checkmate",
+      "paras": [
+        "When your king is attacked, it is in **check**. You must get out of check right away, in one of three ways: **move** the king, **block** the attack, or **capture** the attacker.",
+        "You may never make a move that puts or leaves your own king in check.",
+        "If the king is in check and none of those three ways works, it is **checkmate**, and the game is over."
+      ]
+    },
+    {
+      "title": "Draws",
+      "paras": [
+        "Not every battle has a winner. The game is a **draw** when:",
+        "• **Stalemate:** the player to move is not in check but has no legal move.",
+        "• **Not enough troops:** neither side has enough pieces left to checkmate (for example, king against king).",
+        "• **Repetition:** the same position appears three times.",
+        "• **Fifty-move rule:** 50 moves pass with no capture and no pawn move.",
+        "• **Truce:** both players agree to a draw."
+      ]
+    },
+    {
+      "title": "Battle Tips",
+      "paras": [
+        "• **Take the center.** Pawns and pieces in the middle of the board control the most squares.",
+        "• **Bring out your knights and bishops early**, before moving the same piece twice.",
+        "• **Castle early** to keep your king safe behind a wall of pawns.",
+        "• **Before every move, ask:** what is my opponent threatening? Is any of my pieces left unprotected?",
+        "• **Count the value.** Pawn 1, knight 3, bishop 3, rook 5, queen 9. Don't trade a big piece for a small one."
+      ]
+    },
+    {
+      "title": "Playing BattleCore",
+      "paras": [
+        "**Tap a piece** to see every square it can move to, then tap a marked square to move. A dot marks an open square; a ring marks a capture.",
+        "**Hover**, or press and hold on a phone, to see a piece's name.",
+        "New to chess? Open **Training** from the menu. Boot Camp teaches how each piece moves, and Battle Tactics teaches 12 famous moves."
+      ]
+    }
+  ],
+  "pieces": {
+    "k": { "moves": "One square in any direction. Never into danger. Lose him and you lose the game.", "value": "∞" },
+    "q": { "moves": "Any distance in a straight line or diagonal. The strongest piece.", "value": "9" },
+    "r": { "moves": "Any distance straight up, down, left or right.", "value": "5" },
+    "b": { "moves": "Any distance diagonally. It always stays on one square color.", "value": "3" },
+    "n": { "moves": "An L shape: two squares one way, then one to the side. Jumps over pieces.", "value": "3" },
+    "p": { "moves": "One square forward (two on its first move). Captures one square diagonally forward.", "value": "1" }
+  }
+}

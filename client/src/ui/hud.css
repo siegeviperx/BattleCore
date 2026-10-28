@@ -1112,8 +1112,12 @@
 
 .bc-modes {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .bc-modes { grid-template-columns: repeat(2, 1fr); }
 }
 
 .bc-mode {
@@ -2013,4 +2017,339 @@
   display: block;
   color: var(--bc-ink-mute);
   font-size: 12px;
+}
+
+/* ---- Training: lesson list (menu) ---- */
+.bc-field__count {
+  margin-left: 8px;
+  font-family: var(--bc-font-body);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--bc-ink-mute);
+}
+
+.bc-lessons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.bc-lesson-btn {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--bc-ink);
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--bc-steel-edge);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.bc-lesson-btn:hover { border-color: #6d6350; }
+
+.bc-lesson-btn[aria-pressed='true'] {
+  border-color: var(--bc-sunset);
+  background: rgba(243, 154, 60, 0.12);
+}
+
+.bc-lesson-btn:focus-visible {
+  outline: 2px solid var(--bc-focus);
+  outline-offset: 2px;
+}
+
+.bc-lesson-btn__mark {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--bc-steel-edge);
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1206;
+}
+
+.bc-lesson-btn[data-done] .bc-lesson-btn__mark {
+  border-color: var(--bc-gold);
+  background: var(--bc-gold);
+}
+
+.bc-lesson-btn__title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.bc-lesson-btn__sub {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--bc-ink-dim);
+}
+
+.bc-guide-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--bc-ink);
+  background: linear-gradient(180deg, rgba(246, 197, 68, 0.16), rgba(246, 197, 68, 0.06));
+  border: 2px solid rgba(246, 197, 68, 0.55);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.bc-guide-btn:hover { filter: brightness(1.12); }
+
+.bc-guide-btn:focus-visible {
+  outline: 2px solid var(--bc-focus);
+  outline-offset: 2px;
+}
+
+.bc-guide-btn__icon { font-size: 26px; }
+
+.bc-guide-btn__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.bc-guide-btn__text strong { font-size: 15px; }
+
+.bc-guide-btn__text small {
+  font-size: 12px;
+  color: var(--bc-ink-dim);
+}
+
+.bc-menu__links {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* ---- Training: coach card (in game, under the turn pill) ---- */
+.bc-coach {
+  width: min(520px, 100%);
+  padding: 10px 14px 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(40, 36, 31, 0.94), rgba(22, 20, 17, 0.96));
+  border: 2px solid var(--bc-steel-edge);
+  border-left: 5px solid var(--bc-sunset);
+  box-shadow: var(--bc-shadow);
+  pointer-events: auto;
+  transition: border-color 200ms ease;
+}
+
+.bc-coach[data-mood='good'] { border-left-color: #6fbf4a; }
+.bc-coach[data-mood='oops'] { border-left-color: #e5582a; animation: bc-coach-shake 360ms ease; }
+
+@keyframes bc-coach-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.bc-coach__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.bc-coach__kicker {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bc-sunset);
+}
+
+.bc-coach__title {
+  font-family: var(--bc-font-head);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bc-gold);
+}
+
+.bc-coach__text {
+  margin: 4px 0 8px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--bc-ink);
+}
+
+.bc-coach__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.bc-coach__btn {
+  min-height: 34px;
+  padding: 4px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--bc-steel-edge);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--bc-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bc-coach__btn:first-child {
+  border-color: rgba(246, 197, 68, 0.6);
+  color: var(--bc-gold);
+}
+
+.bc-coach__btn:hover { filter: brightness(1.2); }
+
+.bc-coach__btn:focus-visible {
+  outline: 2px solid var(--bc-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .bc-coach { padding: 8px 10px; }
+  .bc-coach__text { font-size: 14px; margin: 2px 0 6px; }
+  .bc-coach__btn { min-height: 40px; flex: 1; }
+}
+
+/* ---- Training: lesson cards and the How to Play guide ---- */
+.bc-guide__kicker {
+  margin-bottom: 4px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bc-sunset);
+}
+
+.bc-lesson__text {
+  line-height: 1.5;
+  color: var(--bc-ink);
+}
+
+.bc-guide {
+  width: min(560px, 100%);
+  max-height: min(86vh, 760px);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.bc-guide .bc-guide__kicker,
+.bc-guide__title { text-align: center; }
+
+.bc-guide__title { font-size: clamp(24px, 6vw, 34px); }
+
+.bc-guide__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bc-ink-dim);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.bc-guide__close:hover { color: var(--bc-ink); background: rgba(255, 255, 255, 0.06); }
+
+.bc-guide__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 8px 0 14px;
+  padding-right: 4px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--bc-ink-dim);
+}
+
+.bc-guide__body p { margin: 0 0 10px; }
+.bc-guide__body strong { color: var(--bc-ink); }
+
+.bc-guide__pieces {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bc-guide__piece {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--bc-steel-edge);
+}
+
+.bc-guide__arts {
+  display: flex;
+  flex: none;
+}
+
+.bc-guide__art {
+  width: 44px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.bc-guide__art + .bc-guide__art { margin-left: -8px; }
+
+.bc-guide__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bc-guide__role {
+  font-size: 15px;
+  color: var(--bc-gold);
+}
+
+.bc-guide__role small {
+  font-weight: 400;
+  color: var(--bc-ink-mute);
+}
+
+.bc-guide__names {
+  font-size: 12px;
+  color: var(--bc-ink-mute);
+}
+
+.bc-guide__moves {
+  font-size: 14px;
+  color: var(--bc-ink);
+}
+
+.bc-guide__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bc-guide__nav .bc-btn { min-width: 110px; }
+.bc-guide__nav .bc-btn:disabled { opacity: 0.4; cursor: default; }
+
+.bc-guide__count {
+  font-size: 13px;
+  color: var(--bc-ink-mute);
+  font-variant-numeric: tabular-nums;
 }
