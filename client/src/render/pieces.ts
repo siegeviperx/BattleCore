@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { BoardPiece, Color, MoveAnim, PieceType, Square } from '../core/types';
-import data from '../data/pieces.json';
+import { army } from '../packs';
 import { BOARD_Y, squareToFR, squareToXZ } from './coords';
 import { CUTOUT_ASPECT, cutoutHit, getBaseTopTexture, getCutout, hasArt } from './cutouts';
 import { sfx } from '../audio';
@@ -24,7 +24,7 @@ const baseMats = new Map<Color, THREE.Material[]>();
 function getBaseMaterials(color: Color): THREE.Material[] {
   let m = baseMats.get(color);
   if (!m) {
-    const side = new THREE.MeshStandardMaterial({ color: data.factions[color].base, roughness: 0.42, metalness: 0.25 });
+    const side = new THREE.MeshStandardMaterial({ color: army(color).colors.base, roughness: 0.42, metalness: 0.25 });
     const top = new THREE.MeshStandardMaterial({ map: getBaseTopTexture(color), roughness: 0.38, metalness: 0.15 });
     m = [side, top, side];
     baseMats.set(color, m);

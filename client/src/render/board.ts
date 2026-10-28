@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { activeBoard } from '../boards';
 import { BOARD_Y } from './coords';
 import { TABLE_Y, woodTexture } from './scene';
 
-const LIGHT = '#e8dcc0';
-const DARK = '#3b3127';
+const THEME = activeBoard().theme;
+const [LIGHT, DARK] = THEME.squares;
 /** Outer size of the frame (board is 8×8). */
 const FRAME = 9.5;
 const RIM = (FRAME - 8) / 2;
@@ -63,7 +64,7 @@ function labelsTexture(): THREE.CanvasTexture {
   ctx.fillRect(0, 0, S, S);
   ctx.clearRect(RIM * u, RIM * u, 8 * u, 8 * u);
   // inner brass trim + outer edge
-  ctx.strokeStyle = '#b8893f';
+  ctx.strokeStyle = THEME.trim;
   ctx.lineWidth = 7;
   ctx.strokeRect(RIM * u - 4, RIM * u - 4, 8 * u + 8, 8 * u + 8);
   ctx.strokeStyle = 'rgba(0,0,0,0.6)';
@@ -116,7 +117,7 @@ export function createBoard(): THREE.Group {
 
   // Plinth under the board, from the table up to the board surface.
   const plinthH = BOARD_Y - TABLE_Y;
-  const frameMat = new THREE.MeshStandardMaterial({ color: '#3a2415', roughness: 0.55, metalness: 0.1 });
+  const frameMat = new THREE.MeshStandardMaterial({ color: THEME.frame, roughness: 0.55, metalness: 0.1 });
   const plinth = new THREE.Mesh(new THREE.BoxGeometry(FRAME, plinthH, FRAME), frameMat);
   plinth.position.y = TABLE_Y + plinthH / 2;
   plinth.castShadow = true;
@@ -140,7 +141,7 @@ export function createBoard(): THREE.Group {
 
   // Raised rim (four boxes) + labelled top.
   const rimH = RIM_TOP - BOARD_Y + 0.02;
-  const rimMat = new THREE.MeshStandardMaterial({ color: '#2e1c10', roughness: 0.6 });
+  const rimMat = new THREE.MeshStandardMaterial({ color: THEME.rim, roughness: 0.6 });
   const mk = (w: number, d: number, x: number, z: number) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, rimH, d), rimMat);
     m.position.set(x, RIM_TOP - rimH / 2, z);
@@ -168,7 +169,7 @@ export function createBoard(): THREE.Group {
   g.add(labels);
 
   // Brass corner caps.
-  const brass = new THREE.MeshStandardMaterial({ color: '#b8893f', metalness: 1, roughness: 0.35 });
+  const brass = new THREE.MeshStandardMaterial({ color: THEME.trim, metalness: 1, roughness: 0.35 });
   const capGeo = new THREE.BoxGeometry(0.5, 0.42, 0.5);
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {

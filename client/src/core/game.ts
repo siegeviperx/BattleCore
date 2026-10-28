@@ -1,7 +1,7 @@
 // Authoritative game state. Wraps the shared rules engine (the same one the server runs) so the rest of the
 // app never touches it directly.
 import { ChessGame, START_FEN, type RulesMove } from '../../../shared/rules/game.ts';
-import { lookCount } from './looks';
+import { lookCount } from '../packs';
 import type { BoardPiece, Color, MoveAnim, MoveTarget, PieceType, Square } from './types';
 
 export type GameOutcome =

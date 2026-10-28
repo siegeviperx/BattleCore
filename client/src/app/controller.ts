@@ -5,8 +5,8 @@ import { audio, sfx } from '../audio';
 import { Game, type PlayedMove } from '../core/game';
 import { LESSON_GROUPS, lessonById, lessonText, markLessonDone, nextLesson, type Lesson } from '../core/lessons';
 import type { Color, MoveTarget, Square } from '../core/types';
-import data from '../data/pieces.json';
 import { OnlineClient, type ConnectionState } from '../net/client';
+import { army } from '../packs';
 import type { BoardView } from '../render/types';
 import type { Hud, IntroMode, MenuChoice, OnlineRequest } from '../ui/types';
 
@@ -29,7 +29,7 @@ const RESULT_TEXT: Record<GameOverReason, string> = {
   agreement: 'Both sides agreed to a truce.',
 };
 
-const factionName = (c: Color) => data.factions[c].name;
+const factionName = (c: Color) => army(c).name;
 const other = (c: Color): Color => (c === 'w' ? 'b' : 'w');
 
 interface LessonRun {

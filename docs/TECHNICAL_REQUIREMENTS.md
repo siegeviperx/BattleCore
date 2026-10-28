@@ -80,8 +80,8 @@ Only the models gate the start of play. Music streams as it plays.
 | Asset group | Size | Loading |
 |---|---|---|
 | JS bundle | ~870 KB (~235 KB gzip) | Blocking |
-| Sticker art (`assets/pieces`, 15 PNG) | 4.7 MB | Loaded with the board |
-| Fighter models (`assets/fighters`, 15 GLB) | 7.0 MB | Background preload; gates the start card |
+| Sticker art (`src/packs/*/pieces`, 15 PNG) | 4.7 MB | Loaded with the board |
+| Fighter models (`src/packs/*/models`, 15 GLB) | 7.0 MB | Background preload; gates the start card |
 | Intro models (`assets/intro`, 3 GLB) | 1.8 MB | Background preload; gates the start card |
 | Sound effects (`assets/audio/ai`, `assets/audio/kenney`) | ~1.5 MB | On first use, then cached |
 | Music (`assets/audio/music`, 5 MP3) | ~6.9 MB | Streamed per track |
@@ -91,9 +91,10 @@ Only the models gate the start of play. Music streams as it plays.
   model, about 3x larger.
 - The "Tap to start" card waits for the intro and fighter models, **capped at 30 s**. After that, any
   model still missing is replaced by its procedural stand-in, so a fight never waits on the network.
-- Netlify serves `/assets/*` with `Cache-Control: public, max-age=604800` (7 days). Asset filenames
-  are **not** content-hashed, so a changed asset can reach returning players up to 7 days late.
-  Either rename the file when its contents change, or accept the delay.
+- Netlify serves `/assets/*` with `Cache-Control: public, max-age=604800` (7 days). Pack art and models
+  (`src/packs/`) get content-hashed filenames at build time, so changes reach players at once. Files under
+  `public/assets/` (intro models, audio) are **not** hashed, so a change there can reach returning players up
+  to 7 days late: rename the file when its contents change.
 
 ### 3.2 Frame rate and rendering
 
@@ -132,7 +133,7 @@ A crashed or cancelled worker is recreated on the next request.
   cross-checked against chess.js in tests): castling, en passant, promotion (player chooses Q/R/B/N),
   check, checkmate, stalemate, threefold repetition, insufficient material and the fifty-move rule.
 - Game logic **never imports rendering code** (this keeps a future engine port small; see DESIGN.md §9).
-- Pawn looks are assigned by **starting file** (`pieces.json` `looks`, `core/looks.ts`), so a pawn
+- Pawn looks are assigned by **starting file** (the pack piece's `looks`, see `src/packs/index.ts`), so a pawn
   keeps its look for the whole game.
 
 ### 4.2 Rendering (`client/src/render`)
@@ -151,7 +152,7 @@ A crashed or cancelled worker is recreated on the next request.
 - The models are static textured Meshy GLBs moved by code. The one exception is the **rigged Baby
   Rifleman** (`w-p`), which plays its idle and hit-reaction clips and holds a toy blaster on its
   `RightHand` bone. Its Meshy attack clip is deliberately not used.
-- Per-model yaw, scale, muzzle point, flier flag and hand bone live in `data/fighter-models.json`.
+- Per-model yaw, scale, muzzle point, flier flag and hand bone live in each look's `tuning` in the pack's `pack.json`.
 - Any fight must be abortable at once (undo, new game, menu) and hand the camera back.
 
 ### 4.4 Intro cinematic (`client/src/cutscene`)
@@ -258,12 +259,12 @@ Dev-only pages:
    ```sh
    npx @gltf-transform/cli optimize in.glb out.glb --compress false \
      --simplify-ratio 0.025 --simplify-error 0.002 --texture-compress webp --texture-size 1024
-   npx @gltf-transform/cli meshopt out.glb client/public/assets/fighters/<key>.glb
+   npx @gltf-transform/cli meshopt out.glb client/src/packs/<pack>/models/<slot>.glb
    ```
 3. Load every model through `render/gltf.ts` (`gltfLoader()`), which has the meshopt decoder.
    A plain `GLTFLoader` **cannot** read the shipped files.
 4. Each model must face local +Z after its `yaw` tuning. Tune yaw, scale and muzzle in
-   `fighter-models.json`, not in the file.
+   the look's `tuning` in `pack.json`, not in the file.
 5. **Rigging:** Meshy auto-rig works only on **empty-handed T-pose** models; weapons are attached in
    code. Do not auto-rig models that are already holding weapons.
 
@@ -296,7 +297,7 @@ Dev-only pages:
 
 ## 9. Known Limitations
 
-- Asset filenames are not content-hashed (see §3.1 caching).
+- Intro models and audio under `public/assets/` are not content-hashed (see §3.1 caching).
 - The server keeps rooms in memory, runs on a single machine and has no persistence (§5.3).
 - There are no accounts, matchmaking, clocks, spectators or ratings.
 - Landscape phones have no dedicated layout.

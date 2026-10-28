@@ -9,61 +9,19 @@
     "cameraOut": 0.5
   },
   "camera": {
-    "full": { "side": 3.4, "up": 1.55, "back": 0.1, "lookUp": 0.5, "pushIn": 0.12 },
-    "quick": { "side": 4.1, "up": 2.2, "back": 0.1, "lookUp": 0.45, "pushIn": 0.05 }
-  },
-  "pieces": {
-    "w": {
-      "p": {
-        "attack": { "kind": "burst", "shots": 3, "projectile": "dart", "color": "#ff7a1a", "then": "tackle" },
-        "knockout": { "kind": "pratfall" }
-      },
-      "n": {
-        "attack": { "kind": "dive", "strafe": { "shots": 4, "projectile": "dart", "color": "#2a6fdb" } },
-        "knockout": { "kind": "launch" }
-      },
-      "b": {
-        "attack": { "kind": "snipe", "projectile": "dart", "color": "#ff7a1a" },
-        "knockout": { "kind": "spinout" }
-      },
-      "r": {
-        "attack": { "kind": "volley", "count": 3, "projectile": "ball", "color": "#2a2a2e", "arc": 0.7 },
-        "knockout": { "kind": "topple" }
-      },
-      "q": {
-        "attack": { "kind": "twirl", "turns": 2, "shots": 4, "projectile": "dart", "color": "#e0479e" },
-        "knockout": { "kind": "spinout" }
-      },
-      "k": {
-        "attack": { "kind": "volley", "count": 1, "projectile": "bottle", "color": "#f6f4ee", "arc": 1.1, "windup": "command" },
-        "knockout": { "kind": "pratfall" }
-      }
+    "full": {
+      "side": 3.4,
+      "up": 1.55,
+      "back": 0.1,
+      "lookUp": 0.5,
+      "pushIn": 0.12
     },
-    "b": {
-      "p": {
-        "attack": { "kind": "pounce" },
-        "knockout": { "kind": "launch" }
-      },
-      "n": {
-        "attack": { "kind": "dive", "strafe": { "shots": 5, "projectile": "bullet", "color": "#ffe08a" } },
-        "knockout": { "kind": "launch" }
-      },
-      "b": {
-        "attack": { "kind": "charge" },
-        "knockout": { "kind": "flatten" }
-      },
-      "r": {
-        "attack": { "kind": "volley", "count": 1, "projectile": "boulder", "color": "#6b6460", "arc": 1.3 },
-        "knockout": { "kind": "topple" }
-      },
-      "q": {
-        "attack": { "kind": "breath" },
-        "knockout": { "kind": "spinout" }
-      },
-      "k": {
-        "attack": { "kind": "volley", "count": 4, "projectile": "missile", "color": "#c2312a", "arc": 0.9, "windup": "roar" },
-        "knockout": { "kind": "topple" }
-      }
+    "quick": {
+      "side": 4.1,
+      "up": 2.2,
+      "back": 0.1,
+      "lookUp": 0.45,
+      "pushIn": 0.05
     }
   }
 }

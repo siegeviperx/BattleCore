@@ -1,9 +1,9 @@
 import './hud.css';
 import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import { audio, sfx, type SoundMode, type VolumeKind } from '../audio';
-import data from '../data/pieces.json';
 import guide from '../data/guide.json';
 import { LESSON_GROUPS, LESSONS, completedLessons, lessonText } from '../core/lessons';
+import { GLYPHS, army, pieceLook } from '../packs';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
 import type { BannerKind, CoachAction, CoachState, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
 
@@ -20,9 +20,11 @@ interface FactionInfo {
   secondary: string;
 }
 
-const FACTIONS = data.factions as Record<Color, FactionInfo>;
-const PIECES = data.pieces as Record<Color, Record<PieceType, { name: string; icon: string }>>;
-const GLYPHS = data.glyphs as Record<PieceType, string>;
+const FACTIONS: Record<Color, FactionInfo> = {
+  w: { name: army('w').name, short: army('w').short, ...army('w').colors },
+  b: { name: army('b').name, short: army('b').short, ...army('b').colors },
+};
+const PIECES: Record<Color, Record<PieceType, { name: string; icon: string }>> = { w: army('w').pieces, b: army('b').pieces };
 
 const VALUES: Record<PieceType, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const LEVELS: { id: Level; label: string; hint: string }[] = [
@@ -509,10 +511,9 @@ export function createHud(root: HTMLElement): Hud {
   }
 
   function guidePieces(): HTMLElement {
-    const art = data.pieces as Record<Color, Record<PieceType, { art: string }>>;
     const info = guide.pieces as Record<PieceType, { moves: string; value: string }>;
     const img = (c: Color, t: PieceType): HTMLImageElement =>
-      el('img', 'bc-guide__art', { src: `${import.meta.env.BASE_URL}assets/${art[c][t].art}`, alt: '', loading: 'lazy' });
+      el('img', 'bc-guide__art', { src: pieceLook(c, t).art ?? '', alt: '', loading: 'lazy' });
     return el(
       'ul',
       'bc-guide__pieces',

@@ -4,7 +4,7 @@
 import { audio, sfx, type CueName } from '../audio';
 import { CUES, FILES } from '../audio/cues';
 import type { BoardPiece, Color, FightMode, PieceType } from '../core/types';
-import data from '../data/pieces.json';
+import { army, pieceInfo } from '../packs';
 import { createBoardView } from '../render';
 
 const params = new URLSearchParams(location.search);
@@ -28,7 +28,7 @@ const status = $<HTMLSpanElement>('status');
 const TYPES: PieceType[] = ['p', 'n', 'b', 'r', 'q', 'k'];
 for (const c of ['w', 'b'] as Color[]) {
   for (const t of TYPES) {
-    const label = `${data.factions[c].short}: ${data.pieces[c][t].name}`;
+    const label = `${army(c).short}: ${pieceInfo(c, t).name}`;
     aSel.add(new Option(label, c + t));
     dSel.add(new Option(label, c + t));
   }
@@ -59,7 +59,7 @@ async function fight(a: string, d: string): Promise<void> {
   view.setPosition(pieces);
   view.setViewSide(ac, false);
   view.setFightMode(modeSel.value as FightMode);
-  status.textContent = `${data.pieces[ac][a[1] as PieceType].name} vs ${data.pieces[dc][d[1] as PieceType].name}`;
+  status.textContent = `${pieceInfo(ac, a[1] as PieceType).name} vs ${pieceInfo(dc, d[1] as PieceType).name}`;
   await new Promise((r) => setTimeout(r, 400));
   const t0 = performance.now();
   fightStart = t0;

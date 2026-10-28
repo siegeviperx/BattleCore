@@ -50,8 +50,13 @@ pairs with Dragons, Babies, or anything else without new work.
 
 ### 3.2 Pack layout
 
+> **Status: done (P1 step 2).** Babies and Dinos live in `client/src/packs/babies` and `client/src/packs/dinos`,
+> loaded by `client/src/packs/index.ts`. Packs sit under `src/` (not `public/`) so the build gives every
+> asset a content-hashed URL, which fixes the 7-day cache problem. Each piece has a `looks` array; a look has
+> `art`, `model` and `tuning`. Board definitions follow the same pattern in `client/src/boards/`.
+
 ```
-client/public/packs/<pack-id>/
+client/src/packs/<pack-id>/        (found automatically; folder name = pack id)
   pack.json            manifest (below)
   pieces/<slot>.png    paper-cutout sticker art
   models/<slot>.glb    3D fighter model (meshopt-compressed)

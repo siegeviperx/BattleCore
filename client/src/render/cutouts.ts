@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { lookCount, lookKey } from '../core/looks';
 import type { Color, PieceType } from '../core/types';
-import data from '../data/pieces.json';
+import { GLYPHS, army, lookCount, pieceInfo, pieceLook } from '../packs';
 
 /** Logical canvas size (drawn at 2× for crispness). */
 const W = 256;
@@ -27,7 +26,7 @@ export interface Cutout {
 const cache = new Map<string, Cutout>();
 
 export function getCutout(color: Color, type: PieceType, look = 0): Cutout {
-  const key = lookKey(color, type, look);
+  const key = `${color}-${type}-${look % lookCount(color, type)}`;
   let c = cache.get(key);
   if (!c) {
     c = drawCutout(color, type, look);
@@ -37,7 +36,7 @@ export function getCutout(color: Color, type: PieceType, look = 0): Cutout {
 }
 
 export function hasArt(color: Color, type: PieceType): boolean {
-  return Boolean((data.pieces[color][type] as { art?: string }).art);
+  return pieceLook(color, type).art !== null;
 }
 
 /** True if the sticker is opaque at texture uv (three.js uv, v up). */
@@ -65,9 +64,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 function drawCutout(color: Color, type: PieceType, look: number): Cutout {
-  const faction = data.factions[color];
-  const piece = data.pieces[color][type];
-  const glyph = data.glyphs[type];
+  const faction = { ...army(color), ...army(color).colors };
+  const piece = pieceInfo(color, type);
+  const glyph = GLYPHS[type];
 
   const cv = document.createElement('canvas');
   cv.width = W * SCALE;
@@ -171,7 +170,7 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
   const cutout: Cutout = { texture, ...buildMask(ctx, cv) };
 
   // Real sticker art replaces the placeholder once it has loaded.
-  const art = lookCount(color, type) > 1 ? `pieces/${lookKey(color, type, look)}.png` : (piece as { art?: string }).art;
+  const art = pieceLook(color, type, look).art;
   if (art) {
     const img = new Image();
     img.onload = () => {
@@ -181,7 +180,7 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
       texture.needsUpdate = true;
       Object.assign(cutout, buildMask(ctx, cv));
     };
-    img.src = `${import.meta.env.BASE_URL}assets/${art}`;
+    img.src = art;
   }
   return cutout;
 }
@@ -241,7 +240,7 @@ const baseCache = new Map<Color, THREE.CanvasTexture>();
 export function getBaseTopTexture(color: Color): THREE.CanvasTexture {
   let t = baseCache.get(color);
   if (t) return t;
-  const f = data.factions[color];
+  const f = { ...army(color).colors, baseEmblem: army(color).colors.emblem };
   const S = 256;
   const cv = document.createElement('canvas');
   cv.width = cv.height = S;

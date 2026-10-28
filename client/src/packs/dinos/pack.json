@@ -1,0 +1,134 @@
+{
+  "id": "dinos",
+  "version": 1,
+  "name": "Armored Dinos",
+  "short": "Dinos",
+  "colors": {
+    "primary": "#8a2620",
+    "secondary": "#4a4a4f",
+    "base": "#9c1f1a",
+    "emblem": "claw"
+  },
+  "credits": [
+    {
+      "role": "3D models & art",
+      "name": "Meshy AI"
+    }
+  ],
+  "pieces": {
+    "k": {
+      "name": "Armored T-Rex",
+      "icon": "🦖",
+      "attack": {
+        "kind": "volley",
+        "count": 4,
+        "projectile": "missile",
+        "color": "#c2312a",
+        "arc": 0.9,
+        "windup": "roar"
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {
+          "art": "pieces/k.png",
+          "model": "models/k.glb"
+        }
+      ]
+    },
+    "q": {
+      "name": "Spinosaurus",
+      "icon": "🐊",
+      "attack": {
+        "kind": "breath"
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {
+          "art": "pieces/q.png",
+          "model": "models/q.glb"
+        }
+      ]
+    },
+    "r": {
+      "name": "Dino Fortress",
+      "icon": "🏯",
+      "attack": {
+        "kind": "volley",
+        "count": 1,
+        "projectile": "boulder",
+        "color": "#6b6460",
+        "arc": 1.3
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {
+          "art": "pieces/r.png",
+          "model": "models/r.glb"
+        }
+      ]
+    },
+    "b": {
+      "name": "Trike Tank",
+      "icon": "🦏",
+      "attack": {
+        "kind": "charge"
+      },
+      "knockout": {
+        "kind": "flatten"
+      },
+      "looks": [
+        {
+          "art": "pieces/b.png",
+          "model": "models/b.glb"
+        }
+      ]
+    },
+    "n": {
+      "name": "Ptero Gunship",
+      "icon": "🦅",
+      "attack": {
+        "kind": "dive",
+        "strafe": {
+          "shots": 5,
+          "projectile": "bullet",
+          "color": "#ffe08a"
+        }
+      },
+      "knockout": {
+        "kind": "launch"
+      },
+      "looks": [
+        {
+          "art": "pieces/n.png",
+          "model": "models/n.glb",
+          "tuning": {
+            "scale": 1.456,
+            "flier": false
+          }
+        }
+      ]
+    },
+    "p": {
+      "name": "Raptor Trooper",
+      "icon": "🦎",
+      "attack": {
+        "kind": "pounce"
+      },
+      "knockout": {
+        "kind": "launch"
+      },
+      "looks": [
+        {
+          "art": "pieces/p.png",
+          "model": "models/p.glb"
+        }
+      ]
+    }
+  }
+}

@@ -2,8 +2,9 @@
 // The framing, camera and timing are shared by every fight; only the attack and knockout clips change per piece.
 import * as THREE from 'three';
 import { sfx } from '../audio';
-import type { FightMode, MoveAnim } from '../core/types';
+import type { Color, FightMode, MoveAnim, PieceType } from '../core/types';
 import choreo from '../data/fights.json';
+import { pieceInfo } from '../packs';
 import type { CameraRig } from '../render/camera';
 import { BOARD_Y, squareToXZ } from '../render/coords';
 import { BASE_H, type PieceLayer, type PieceObj } from '../render/pieces';
@@ -26,12 +27,12 @@ export interface Dimmer {
   setDim(amount: number): void;
 }
 
-export function attackSpec(color: 'w' | 'b', type: keyof typeof choreo.pieces.w): AttackSpec {
-  return choreo.pieces[color][type].attack as AttackSpec;
+export function attackSpec(color: Color, type: PieceType): AttackSpec {
+  return pieceInfo(color, type).attack as unknown as AttackSpec;
 }
 
-export function knockoutSpec(color: 'w' | 'b', type: keyof typeof choreo.pieces.w): KnockoutSpec {
-  return choreo.pieces[color][type].knockout as KnockoutSpec;
+export function knockoutSpec(color: Color, type: PieceType): KnockoutSpec {
+  return pieceInfo(color, type).knockout as unknown as KnockoutSpec;
 }
 
 export class FightDirector {

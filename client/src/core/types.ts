@@ -14,7 +14,7 @@ export interface BoardPiece {
   square: Square;
   color: Color;
   type: PieceType;
-  /** Art variant (see core/looks.ts); 0 or absent = default. */
+  /** Art variant (index into the pack piece's looks); 0 or absent = default. */
   look?: number;
 }
 
