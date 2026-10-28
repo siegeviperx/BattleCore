@@ -72,6 +72,7 @@ function help(): void {
       Make one piece: sticker art + 3D model with Meshy, shrunk for the web, wired into pack.json.
       Slots: k q r b n p (p2 p3 ... for extra pawn looks). Shows the credit cost and asks first.
       --image <file.png>   use your own art (transparent PNG) instead of generating it (no art credits)
+      --model <file.glb>   use your own full-size 3D model instead of generating it (no model credits)
       --ref <file.png>     extra style reference image (repeatable; art-source/packs/<id>/concept/* are always used)
       --art-only           only make the sticker        --model-only   only make the 3D model from existing art
       --fresh              ignore earlier Meshy tasks for this slot and pay for new ones
@@ -155,6 +156,7 @@ async function cmdPiece(args: string[]): Promise<void> {
     options: {
       prompt: { type: 'string' },
       image: { type: 'string' },
+      model: { type: 'string' },
       ref: { type: 'string', multiple: true, default: [] },
       'art-only': { type: 'boolean', default: false },
       'model-only': { type: 'boolean', default: false },
@@ -182,17 +184,23 @@ async function cmdPiece(args: string[]): Promise<void> {
   const wantModel = !values['art-only'];
   const ownImage = values.image ? resolve(values.image) : null;
   if (ownImage && !existsSync(ownImage)) throw new Error(`No such image: ${values.image}`);
+  const ownModel = values.model ? resolve(values.model) : null;
+  if (ownModel && !existsSync(ownModel)) throw new Error(`No such model: ${values.model}`);
   if (values['model-only'] && !existsSync(rawArt) && !mine.art) throw new Error(`No art for ${slot} yet; make it first (drop --model-only).`);
 
   // What will run, and what it costs. Earlier tasks for this slot are reused, never paid for twice.
   const newArt = wantArt && !ownImage && !mine.art;
   if (newArt && !values.prompt) throw new Error('Describe the piece with --prompt "…" (or bring your own art with --image file.png).');
-  const newModel = wantModel && (!mine.model || Boolean(ownImage) || newArt);
+  // Art that differs from what this slot already has means the old 3D model no longer matches it.
+  const artChanged = newArt || (ownImage !== null && ownImage !== resolve(rawArt));
+  const newModel = wantModel && !ownModel && (!mine.model || artChanged);
   const cost = (newArt ? meshy.COST.art : 0) + (newModel ? meshy.COST.model : 0);
-  const label = `${pack.name} ${ROLE[where.type]}${where.look ? ` (look ${where.look + 1})` : ''}`;
+  const label = `${pack.pieces[where.type]?.name ?? ROLE[where.type]}${where.look ? ` (look ${where.look + 1})` : ''}`;
   console.log(`\n${label}, slot "${slot}":`);
   if (wantArt) console.log(ownImage ? `  • sticker art from ${relative(ROOT, ownImage)} (free)` : newArt ? `  • sticker art with ${meshy.ART_MODEL} (${meshy.COST.art} credits)` : '  • sticker art: reuse earlier Meshy task (free)');
-  if (wantModel) console.log(newModel ? `  • 3D model with ${meshy.MESH_MODEL}, textured (${meshy.COST.model} credits)` : '  • 3D model: reuse earlier Meshy task (free)');
+  if (wantModel) {
+    console.log(ownModel ? `  • 3D model from ${relative(ROOT, ownModel)} (free)` : newModel ? `  • 3D model with ${meshy.MESH_MODEL}, textured (${meshy.COST.model} credits)` : '  • 3D model: reuse earlier Meshy task (free)');
+  }
   if (cost > 0) {
     const bal = await meshy.balance();
     console.log(`  Total: ${cost} credits. Your balance: ${bal}.`);
@@ -207,8 +215,10 @@ async function cmdPiece(args: string[]): Promise<void> {
   if (wantArt) {
     mkdirSync(dirname(rawArt), { recursive: true });
     if (ownImage) {
-      copyFileSync(ownImage, rawArt);
-      delete mine.art; // a model must now come from this image, not an old Meshy picture
+      if (ownImage !== resolve(rawArt)) {
+        copyFileSync(ownImage, rawArt);
+        delete mine.art; // new art: a model must now come from this image, not the old Meshy picture
+      }
     } else {
       if (!mine.art) {
         const refs = referenceImages(id, values.ref ?? []);
@@ -226,15 +236,19 @@ async function cmdPiece(args: string[]): Promise<void> {
 
   // 2. 3D model
   if (wantModel) {
-    if (newModel || !mine.model) {
-      mine.model = await meshy.createModel(mine.art ? { artTaskId: mine.art.id } : { image: dataUri(rawArt) });
-      saveTasks();
-      console.log(`  model task ${mine.model}`);
-    }
-    const task = await meshy.waitTask('image-to-3d', mine.model, progress('3D model'));
     mkdirSync(dirname(rawModel), { recursive: true });
-    writeFileSync(rawModel, await meshy.download(task.model_urls!.glb!));
-    done('3D model');
+    if (ownModel) {
+      if (ownModel !== resolve(rawModel)) copyFileSync(ownModel, rawModel);
+    } else {
+      if (newModel || !mine.model) {
+        mine.model = await meshy.createModel(mine.art ? { artTaskId: mine.art.id } : { image: dataUri(rawArt) });
+        saveTasks();
+        console.log(`  model task ${mine.model}`);
+      }
+      const task = await meshy.waitTask('image-to-3d', mine.model, progress('3D model'));
+      writeFileSync(rawModel, await meshy.download(task.model_urls!.glb!));
+      done('3D model');
+    }
     process.stdout.write('  shrinking for the web…');
     const out = join(PACKS, id, 'models', `${slot}.glb`);
     optimize(rawModel, out);
