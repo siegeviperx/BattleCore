@@ -1,0 +1,358 @@
+{
+  "groups": [
+    { "id": "basics", "title": "Boot Camp", "sub": "How each piece moves" },
+    { "id": "moves", "title": "Battle Tactics", "sub": "12 famous moves every player knows" }
+  ],
+  "lessons": [
+    {
+      "id": "pawn",
+      "group": "basics",
+      "title": "The Pawn",
+      "summary": "March forward, capture diagonally",
+      "side": "w",
+      "fen": "4k3/3p4/8/8/8/8/4P3/4K3 w - - 0 1",
+      "intro": "Your {w.p} is a pawn. Pawns march straight forward one square at a time, but on their very first move they may charge two squares.",
+      "steps": [
+        {
+          "say": "Charge! Move your {w.p} two squares forward.",
+          "accept": ["e2e4"],
+          "praise": "Nice charge! Watch: the enemy charges too.",
+          "reply": "d7d5"
+        },
+        {
+          "say": "Pawns move straight but capture diagonally, one square forward. Capture the {b.p}!",
+          "accept": ["e4d5"]
+        }
+      ],
+      "done": "Pawns move forward and capture diagonally. They can never move backward."
+    },
+    {
+      "id": "knight",
+      "group": "basics",
+      "title": "The Knight",
+      "summary": "Jump in an L shape, over anything",
+      "side": "w",
+      "fen": "7k/8/8/4p3/8/8/5PPP/6NK w - - 0 1",
+      "intro": "Your {w.n} is a knight. It moves in an L: two squares one way, then one square to the side. It is the only piece that can jump over others.",
+      "steps": [
+        {
+          "say": "Jump your {w.n} over your own pawns, toward the enemy.",
+          "accept": ["g1f3"],
+          "praise": "Over the wall! Knights don't care what's in the way.",
+          "reply": "h8g8"
+        },
+        {
+          "say": "One more L-shaped jump captures the {b.p}. Go!",
+          "accept": ["f3e5"]
+        }
+      ],
+      "done": "Knights jump in an L and leap over pieces. Their tricky jumps are great for surprise attacks."
+    },
+    {
+      "id": "bishop",
+      "group": "basics",
+      "title": "The Bishop",
+      "summary": "Slide diagonally, any distance",
+      "side": "w",
+      "fen": "7k/8/7p/8/8/8/8/2B4K w - - 0 1",
+      "intro": "Your {w.b} is a bishop. It slides diagonally as far as it likes, as long as nothing is in the way. A bishop always stays on squares of one color.",
+      "steps": [
+        {
+          "say": "Slide your {w.b} all the way across the board and capture the {b.p}.",
+          "accept": ["c1h6"]
+        }
+      ],
+      "done": "Bishops slide diagonally any distance. Each side starts with one on light squares and one on dark squares."
+    },
+    {
+      "id": "rook",
+      "group": "basics",
+      "title": "The Rook",
+      "summary": "Slide straight, any distance",
+      "side": "w",
+      "fen": "7k/p7/8/8/8/8/8/R6K w - - 0 1",
+      "intro": "Your {w.r} is a rook. It slides straight up, down, left or right, as far as the path is clear.",
+      "steps": [
+        {
+          "say": "Send your {w.r} straight up the board to capture the {b.p}.",
+          "accept": ["a1a7"]
+        }
+      ],
+      "done": "Rooks slide in straight lines. Two rooks working together are very strong."
+    },
+    {
+      "id": "queen",
+      "group": "basics",
+      "title": "The Queen",
+      "summary": "Straight or diagonal: the strongest piece",
+      "side": "w",
+      "fen": "7k/8/8/p6p/8/8/8/3Q3K w - - 0 1",
+      "intro": "Your {w.q} is the queen, the most powerful piece. She moves like a rook and a bishop combined: straight or diagonal, any distance.",
+      "steps": [
+        {
+          "say": "Strike diagonally! Capture the {b.p} on the right side of the board.",
+          "accept": ["d1h5"],
+          "praise": "That also attacks the enemy king. That's called check, so the king must step aside.",
+          "reply": "h8g7"
+        },
+        {
+          "say": "Now slide straight across the row and capture the other {b.p}.",
+          "accept": ["h5a5"]
+        }
+      ],
+      "done": "The queen moves straight or diagonally, any distance. Keep her safe; she is worth more than any other piece."
+    },
+    {
+      "id": "king",
+      "group": "basics",
+      "title": "The King",
+      "summary": "One square any way; protect him!",
+      "side": "w",
+      "fen": "7k/8/8/8/8/8/3p4/4K3 w - - 0 1",
+      "intro": "Your {w.k} is the king. He moves one square in any direction. If your king is trapped, you lose the game, so keep him safe!",
+      "steps": [
+        {
+          "say": "A {b.p} is attacking your {w.k}! Kings can capture too. Take it!",
+          "accept": ["e1d2"]
+        }
+      ],
+      "done": "The king moves one square any way and may never move into danger. Protecting him is the whole point of chess."
+    },
+    {
+      "id": "castling",
+      "group": "moves",
+      "title": "Castling",
+      "summary": "Tuck your king safely behind a wall",
+      "side": "w",
+      "fen": "4k3/8/8/8/8/8/5PPP/4K2R w K - 0 1",
+      "intro": "Castling is the only move where two pieces move at once. Your king steps two squares toward a rook, and the rook hops over to the king's other side. You may castle only if neither piece has moved yet, nothing stands between them, and your king isn't in check or passing through danger.",
+      "steps": [
+        {
+          "say": "Castle! Move your {w.k} two squares to the right, toward the {w.r}.",
+          "accept": ["e1g1"]
+        }
+      ],
+      "done": "Castling tucks the king behind a wall of pawns and brings the rook into the fight. Most good games castle early."
+    },
+    {
+      "id": "promotion",
+      "group": "moves",
+      "title": "Promotion",
+      "summary": "A pawn that reaches the end becomes a queen",
+      "side": "w",
+      "fen": "7k/4P3/8/8/8/8/8/K7 w - - 0 1",
+      "intro": "When a pawn reaches the far end of the board, it gets promoted. It turns into a queen, rook, bishop or knight; almost everyone picks the queen.",
+      "steps": [
+        {
+          "say": "March your {w.p} to the last row and promote it to a Queen.",
+          "accept": ["e7e8q"],
+          "wrong": "Any promotion is legal, but pick the Queen. She's the strongest!"
+        }
+      ],
+      "done": "Promotion turns a humble pawn into a new queen. Pushing a pawn all the way is often how endgames are won."
+    },
+    {
+      "id": "en-passant",
+      "group": "moves",
+      "title": "En Passant",
+      "summary": "The sneaky pawn capture",
+      "side": "w",
+      "fen": "4k3/3p4/8/4P3/8/8/8/4K3 b - - 0 1",
+      "setup": ["d7d5"],
+      "intro": "En passant (French for \"in passing\") is a special pawn capture. When an enemy pawn charges two squares and lands right beside your pawn, you may capture it as if it had moved only one square. You must do it right away, or the chance is gone.",
+      "steps": [
+        {
+          "say": "The {b.p} just charged past your {w.p}. Capture it en passant: move diagonally behind it.",
+          "accept": ["e5d6"]
+        }
+      ],
+      "done": "En passant only works right after the enemy pawn's two-square charge, and only pawn against pawn."
+    },
+    {
+      "id": "escape-check",
+      "group": "moves",
+      "title": "Escaping Check",
+      "summary": "Move, block or capture",
+      "side": "w",
+      "fen": "4r2k/8/8/8/8/8/3B4/4K3 w - - 0 1",
+      "intro": "When your king is attacked, it is in check, and you must fix it at once. There are three ways: move the king, block the attack, or capture the attacker.",
+      "steps": [
+        {
+          "say": "The {b.r} has your {w.k} in check! Block it by sliding your {w.b} into the way.",
+          "accept": ["d2e3"],
+          "wrong": "That escapes too, but try blocking with your {w.b}!"
+        }
+      ],
+      "done": "Move, block or capture: always look for all three when you're in check. If none of them works, it's checkmate."
+    },
+    {
+      "id": "back-rank",
+      "group": "moves",
+      "title": "Back-Rank Mate",
+      "summary": "Trap a king behind its own pawns",
+      "side": "w",
+      "fen": "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+      "intro": "Checkmate means the king is in check and has no way out. That ends the game. A king stuck on the back row behind its own pawns is an easy target.",
+      "steps": [
+        {
+          "say": "The enemy king is boxed in by its own pawns. Slide your {w.r} to the back row for checkmate!",
+          "accept": ["d1d8"]
+        }
+      ],
+      "done": "Back-rank mate. Protect yourself by giving your king an escape square, such as moving one pawn in front of it forward."
+    },
+    {
+      "id": "scholars-mate",
+      "group": "moves",
+      "title": "Scholar's Mate",
+      "summary": "Checkmate in 4 moves",
+      "side": "w",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "intro": "Scholar's Mate is a famous trap that beats beginners in just four moves. Your {w.q} and {w.b} team up to attack the weakest square near the enemy king.",
+      "steps": [
+        {
+          "say": "Open the game: move the pawn in front of your {w.k} two squares.",
+          "accept": ["e2e4"],
+          "reply": "e7e5"
+        },
+        {
+          "say": "Bring out your {w.b} from beside the king, aiming it at the enemy king's side.",
+          "accept": ["f1c4"],
+          "reply": "b8c6"
+        },
+        {
+          "say": "Now bring your {w.q} out diagonally to join the attack.",
+          "accept": ["d1h5"],
+          "reply": "g8f6",
+          "praise": "Watch: the enemy brings out a {b.n} to chase your queen, but that leaves a hole!"
+        },
+        {
+          "say": "Capture the pawn next to the enemy king with your {w.q}. Your {w.b} protects her. Checkmate!",
+          "accept": ["h5f7"]
+        }
+      ],
+      "done": "Scholar's Mate! To stop it when someone tries it on you, block the queen's line (for example with your queen or a pawn) before it's too late."
+    },
+    {
+      "id": "fools-mate",
+      "group": "moves",
+      "title": "Fool's Mate",
+      "summary": "The fastest checkmate: 2 moves",
+      "side": "b",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "setup": ["f2f3"],
+      "intro": "Fool's Mate is the fastest checkmate possible. This time you play the Dinos! Watch what happens when someone weakens their king too early.",
+      "steps": [
+        {
+          "say": "The Babies moved a pawn beside their king. Open a path for your {b.q}: move the pawn in front of your {b.k} forward.",
+          "accept": ["e7e5", "e7e6"],
+          "reply": "g2g4",
+          "praise": "Good! Now watch the Babies make another weak move that opens a path to their king."
+        },
+        {
+          "say": "Swoop your {b.q} down that diagonal to the edge of the board. Checkmate!",
+          "accept": ["d8h4"]
+        }
+      ],
+      "done": "Fool's Mate. The lesson: don't move the pawns beside your king early. They are its shield."
+    },
+    {
+      "id": "fork",
+      "group": "moves",
+      "title": "The Fork",
+      "summary": "Attack two pieces at once",
+      "side": "w",
+      "fen": "q3k3/8/8/1N6/8/8/8/4K3 w - - 0 1",
+      "intro": "A fork is one piece attacking two enemy pieces at the same time. They can't both escape! Knights are the best forkers.",
+      "steps": [
+        {
+          "say": "Jump your {w.n} to the square that attacks both the {b.k} and the {b.q}.",
+          "accept": ["b5c7"],
+          "reply": "e8d7",
+          "praise": "Check! The king has to run, so his queen is left behind."
+        },
+        {
+          "say": "Collect your prize: capture the {b.q}!",
+          "accept": ["c7a8"]
+        }
+      ],
+      "done": "A fork that attacks the king (a 'royal fork') is deadly, because the king must escape first."
+    },
+    {
+      "id": "pin",
+      "group": "moves",
+      "title": "The Pin",
+      "summary": "Freeze a piece in front of its king",
+      "side": "w",
+      "fen": "4k3/7p/2n5/8/3P4/8/8/3BK3 w - - 0 1",
+      "intro": "A pin traps an enemy piece in front of a more valuable one. If the pinned piece moves, the piece behind it is exposed. When the king is behind it, the pinned piece can't legally move at all.",
+      "steps": [
+        {
+          "say": "Slide your {w.b} so it lines up the {b.n} with the {b.k} behind it.",
+          "accept": ["d1a4"],
+          "reply": "h7h6",
+          "praise": "Pinned! That {b.n} can't move without exposing its king."
+        },
+        {
+          "say": "Attack the frozen {b.n} with your {w.p}. It can't run away!",
+          "accept": ["d4d5"]
+        }
+      ],
+      "done": "The pinned knight is lost. Bishops, rooks and queens can all pin, because they attack along lines."
+    },
+    {
+      "id": "skewer",
+      "group": "moves",
+      "title": "The Skewer",
+      "summary": "Attack through one piece to the next",
+      "side": "w",
+      "fen": "4q3/8/8/4k3/8/8/8/R6K w - - 0 1",
+      "intro": "A skewer is a pin in reverse. You attack a valuable piece, it moves away, and you capture the piece that was hiding behind it.",
+      "steps": [
+        {
+          "say": "The {b.k} and {b.q} stand on the same line. Move your {w.r} onto that line to check the king.",
+          "accept": ["a1e1"],
+          "reply": "e5d6",
+          "praise": "Check! The king steps aside, uncovering the queen."
+        },
+        {
+          "say": "Slide your {w.r} all the way up and capture the {b.q}!",
+          "accept": ["e1e8"]
+        }
+      ],
+      "done": "Skewers happen when two enemy pieces line up. Watch out for kings and queens standing on the same line!"
+    },
+    {
+      "id": "discovered",
+      "group": "moves",
+      "title": "Discovered Attack",
+      "summary": "Move one piece to unleash another",
+      "side": "w",
+      "fen": "4k3/8/8/8/4N3/2q5/8/4R1K1 w - - 0 1",
+      "intro": "A discovered attack happens when you move one piece out of the way, uncovering an attack from the piece behind it. You get two threats from a single move.",
+      "steps": [
+        {
+          "say": "Your {w.n} blocks your {w.r}'s path to the enemy king. Jump the knight away to capture the {b.q}, and the rook gives check at the same time!",
+          "accept": ["e4c3"]
+        }
+      ],
+      "done": "Discovered check! The enemy must deal with the check, and you've already grabbed their queen."
+    },
+    {
+      "id": "smothered",
+      "group": "moves",
+      "title": "Smothered Mate",
+      "summary": "A knight checkmates a trapped king",
+      "side": "w",
+      "fen": "6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1",
+      "intro": "In a smothered mate, the king is surrounded by its own pieces, so a single knight can checkmate it. Knights jump, so nothing can block their check.",
+      "steps": [
+        {
+          "say": "The enemy king is boxed in by its own troops. Jump your {w.n} to the square that attacks it. Checkmate!",
+          "accept": ["g5f7"]
+        }
+      ],
+      "done": "Smothered mate: the king's own army trapped him. Only a knight can do this."
+    }
+  ]
+}

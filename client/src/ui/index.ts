@@ -2,10 +2,12 @@ import './hud.css';
 import { NAME_MAX_LENGTH, cleanName } from '../../../shared/protocol';
 import { audio, sfx, type SoundMode, type VolumeKind } from '../audio';
 import data from '../data/pieces.json';
+import guide from '../data/guide.json';
+import { LESSON_GROUPS, LESSONS, completedLessons, lessonText } from '../core/lessons';
 import type { Color, FightMode, Level, PieceType } from '../core/types';
-import type { BannerKind, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
+import type { BannerKind, CoachAction, CoachState, Hud, IntroMode, Lobby, MenuChoice, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
 
-export type { Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
+export type { CoachAction, CoachState, Hud, MenuChoice, BannerKind, IntroMode, Lobby, OnlineRequest, OpponentStatus, PieceTip, ScreenInsets } from './types';
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -145,7 +147,9 @@ function prefersReducedMotion(): boolean {
 type OnlineSide = Color | 'random';
 
 interface Saved {
-  mode: 'ai' | 'local' | 'online';
+  mode: 'ai' | 'local' | 'online' | 'learn';
+  /** Training: the lesson picked in the menu. */
+  learnLesson: string;
   humanColor: Color;
   level: Level;
   autoRotate: boolean;
@@ -158,6 +162,7 @@ interface Saved {
 
 const DEFAULTS: Saved = {
   mode: 'ai',
+  learnLesson: LESSONS[0].id,
   humanColor: 'w',
   level: 'medium',
   autoRotate: true,
@@ -174,7 +179,8 @@ function loadSaved(): Saved {
     if (!raw) return { ...DEFAULTS };
     const p = JSON.parse(raw) as Partial<Saved>;
     return {
-      mode: p.mode === 'local' || p.mode === 'online' ? p.mode : 'ai',
+      mode: p.mode === 'local' || p.mode === 'online' || p.mode === 'learn' ? p.mode : 'ai',
+      learnLesson: LESSONS.some((l) => l.id === p.learnLesson) ? (p.learnLesson as string) : DEFAULTS.learnLesson,
       humanColor: p.humanColor === 'b' ? 'b' : 'w',
       level: LEVELS.some((l) => l.id === p.level) ? (p.level as Level) : DEFAULTS.level,
       autoRotate: typeof p.autoRotate === 'boolean' ? p.autoRotate : DEFAULTS.autoRotate,
@@ -267,7 +273,22 @@ export function createHud(root: HTMLElement): Hud {
     oppIcon,
     el('span', 'bc-opp__label', undefined, oppName, oppText),
   );
-  const topBar = el('div', 'bc-top', undefined, turnPill, oppChip);
+  // ----- Training coach card -----
+  const coachCbs: ((a: CoachAction) => void)[] = [];
+  const coachKicker = el('span', 'bc-coach__kicker');
+  const coachTitle = el('span', 'bc-coach__title');
+  const coachText = el('p', 'bc-coach__text');
+  const coachBtn = (action: CoachAction, label: string): HTMLButtonElement =>
+    button('bc-coach__btn', label, () => coachCbs.forEach((cb) => cb(action)));
+  const coach = el(
+    'section',
+    'bc-coach',
+    { 'aria-live': 'polite', 'aria-label': 'Lesson', hidden: true },
+    el('div', 'bc-coach__head', undefined, coachKicker, coachTitle),
+    coachText,
+    el('div', 'bc-coach__actions', undefined, coachBtn('hint', 'Hint'), coachBtn('restart', 'Restart'), coachBtn('guide', 'Rules')),
+  );
+  const topBar = el('div', 'bc-top', undefined, turnPill, oppChip, coach);
 
   // ----- Speaker (quick mute) -----
   const muteBtn = button('bc-mute', [], () => audio.setMuted(!audio.muted));
@@ -480,6 +501,147 @@ export function createHud(root: HTMLElement): Hud {
     });
   }
 
+  /** Text with **bold** spans as DOM nodes, piece-name tokens filled in. */
+  function richText(text: string): (Node | string)[] {
+    return lessonText(text)
+      .split(/\*\*(.+?)\*\*/g)
+      .map((part, i) => (i % 2 ? el('strong', undefined, undefined, part) : part));
+  }
+
+  function guidePieces(): HTMLElement {
+    const art = data.pieces as Record<Color, Record<PieceType, { art: string }>>;
+    const info = guide.pieces as Record<PieceType, { moves: string; value: string }>;
+    const img = (c: Color, t: PieceType): HTMLImageElement =>
+      el('img', 'bc-guide__art', { src: `${import.meta.env.BASE_URL}assets/${art[c][t].art}`, alt: '', loading: 'lazy' });
+    return el(
+      'ul',
+      'bc-guide__pieces',
+      undefined,
+      ...(['k', 'q', 'r', 'b', 'n', 'p'] as PieceType[]).map((t) =>
+        el(
+          'li',
+          'bc-guide__piece',
+          undefined,
+          el('span', 'bc-guide__arts', { 'aria-hidden': 'true' }, img('w', t), img('b', t)),
+          el(
+            'span',
+            'bc-guide__info',
+            undefined,
+            el('strong', 'bc-guide__role', undefined, `${GLYPHS[t]} ${ROLE_NAMES[t]}`, el('small', undefined, undefined, ` · worth ${info[t].value}`)),
+            el('span', 'bc-guide__names', undefined, `${PIECES.w[t].name} / ${PIECES.b[t].name}`),
+            el('span', 'bc-guide__moves', undefined, info[t].moves),
+          ),
+        ),
+      ),
+    );
+  }
+
+  function showGuide(): Promise<void> {
+    return new Promise((resolve) => {
+      const pages = guide.pages as { title: string; paras: string[]; pieces?: boolean }[];
+      let page = 0;
+      const title = el('h2', 'bc-dialog__title bc-guide__title');
+      const body = el('div', 'bc-guide__body');
+      const count = el('span', 'bc-guide__count');
+      const prev = button('bc-btn', 'Back', () => go(page - 1));
+      const next = button('bc-btn bc-btn--primary', 'Next', () => (page === pages.length - 1 ? finish() : go(page + 1)), {
+        'data-autofocus': true,
+      });
+      const closeBtn = button('bc-guide__close', '✕', () => finish(), { 'aria-label': 'Close guide' });
+      const go = (i: number): void => {
+        page = Math.max(0, Math.min(pages.length - 1, i));
+        const pg = pages[page];
+        title.textContent = pg.title;
+        body.replaceChildren(...pg.paras.map((t) => el('p', undefined, undefined, ...richText(t))), ...(pg.pieces ? [guidePieces()] : []));
+        body.scrollTop = 0;
+        count.textContent = `${page + 1} / ${pages.length}`;
+        prev.disabled = page === 0;
+        next.textContent = page === pages.length - 1 ? 'Done' : 'Next';
+      };
+      const finish = (): void => {
+        document.removeEventListener('keydown', onKey, true);
+        close();
+        resolve();
+      };
+      const onKey = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') finish();
+        else if (e.key === 'ArrowRight') go(page + 1);
+        else if (e.key === 'ArrowLeft') go(page - 1);
+        else return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      const node = el(
+        'div',
+        'bc-dialog bc-guide',
+        undefined,
+        closeBtn,
+        el('div', 'bc-guide__kicker', undefined, 'How to play chess'),
+        title,
+        body,
+        el('div', 'bc-guide__nav', undefined, prev, count, next),
+      );
+      go(0);
+      document.addEventListener('keydown', onKey, true);
+      const close = openModal(node, 'How to play chess');
+    });
+  }
+
+  function showLessonIntro(kicker: string, title: string, text: string): Promise<void> {
+    return new Promise((resolve) => {
+      const finish = (): void => {
+        document.removeEventListener('keydown', onKey, true);
+        close();
+        resolve();
+      };
+      const onKey = (e: KeyboardEvent): void => {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          finish();
+        }
+      };
+      const node = el(
+        'div',
+        'bc-dialog bc-lesson',
+        undefined,
+        el('div', 'bc-guide__kicker', undefined, kicker),
+        el('h2', 'bc-dialog__title', undefined, title),
+        el('p', 'bc-dialog__sub bc-lesson__text', undefined, ...richText(text)),
+        el('div', 'bc-dialog__actions', undefined, button('bc-btn bc-btn--primary', "Let's go!", finish, { 'data-autofocus': true })),
+      );
+      document.addEventListener('keydown', onKey, true);
+      const close = openModal(node, title);
+    });
+  }
+
+  function showLessonDone(title: string, text: string, hasNext: boolean): Promise<'next' | 'replay' | 'menu'> {
+    return new Promise((resolve) => {
+      const finish = (r: 'next' | 'replay' | 'menu'): void => {
+        close();
+        resolve(r);
+      };
+      const node = el(
+        'div',
+        'bc-dialog bc-lesson',
+        undefined,
+        el('div', 'bc-gameover__stripe', { 'aria-hidden': 'true' }),
+        el('div', 'bc-guide__kicker', undefined, 'Lesson complete'),
+        el('h2', 'bc-dialog__title', undefined, title),
+        el('p', 'bc-dialog__sub bc-lesson__text', undefined, ...richText(text)),
+        el(
+          'div',
+          'bc-dialog__actions',
+          undefined,
+          ...(hasNext ? [button('bc-btn bc-btn--primary', 'Next lesson', () => finish('next'), { 'data-autofocus': true })] : []),
+          button('bc-btn', 'Replay', () => finish('replay')),
+          button(hasNext ? 'bc-btn' : 'bc-btn bc-btn--primary', 'Menu', () => finish('menu'), hasNext ? undefined : { 'data-autofocus': true }),
+        ),
+      );
+      const close = openModal(node, `${title}: lesson complete`);
+    });
+  }
+
   function showCredits(): void {
     const list = el(
       'dl',
@@ -557,7 +719,7 @@ export function createHud(root: HTMLElement): Hud {
 
     return new Promise<MenuChoice>((resolve) => {
       // Mode cards
-      const modeCard = (id: 'ai' | 'local' | 'online', title: string, desc: string, badge: string): HTMLButtonElement =>
+      const modeCard = (id: Saved['mode'], title: string, desc: string, badge: string): HTMLButtonElement =>
         button(
           `bc-mode bc-mode--${id}`,
           [
@@ -571,6 +733,47 @@ export function createHud(root: HTMLElement): Hud {
       const aiCard = modeCard('ai', 'vs Computer', 'Take on the war-room AI', PIECES.b.k.icon);
       const localCard = modeCard('local', 'Local 2-Player', 'Two generals, one screen', `${PIECES.w.p.icon}${PIECES.b.p.icon}`);
       const onlineCard = modeCard('online', 'Online', 'Private rooms with a code', '📡');
+      const learnCard = modeCard('learn', 'Training', 'New to chess? Start here', '🎓');
+
+      // Training: the guide and the lesson list
+      const done = completedLessons();
+      const lessonBtn = (id: string, title: string, summary: string): HTMLButtonElement =>
+        button(
+          'bc-lesson-btn',
+          [
+            el('span', 'bc-lesson-btn__mark', { 'aria-hidden': 'true' }, done.has(id) ? '✓' : ''),
+            el('span', 'bc-lesson-btn__title', undefined, title),
+            el('span', 'bc-lesson-btn__sub', undefined, lessonText(summary)),
+          ],
+          () => {
+            state.learnLesson = id;
+            sync();
+          },
+          { 'aria-pressed': 'false', 'data-lesson': id, 'data-done': done.has(id) },
+        );
+      const lessonBtns: HTMLButtonElement[] = [];
+      const lessonGroups = LESSON_GROUPS.map((g) => {
+        const lessons = LESSONS.filter((l) => l.group === g.id);
+        const btns = lessons.map((l) => lessonBtn(l.id, l.title, l.summary));
+        lessonBtns.push(...btns);
+        const n = lessons.filter((l) => done.has(l.id)).length;
+        return el(
+          'div',
+          'bc-field',
+          undefined,
+          el('div', 'bc-field__label', undefined, g.title, el('small', 'bc-field__count', undefined, `${n}/${lessons.length} done · ${g.sub}`)),
+          el('div', 'bc-lessons', { role: 'group', 'aria-label': g.title }, ...btns),
+        );
+      });
+      const guideBtn = button(
+        'bc-guide-btn',
+        [
+          el('span', 'bc-guide-btn__icon', { 'aria-hidden': 'true' }, '📖'),
+          el('span', 'bc-guide-btn__text', undefined, el('strong', undefined, undefined, 'How to Play Chess'), el('small', undefined, undefined, 'The rules in 7 quick pages')),
+        ],
+        () => void showGuide(),
+      );
+      const learnOptions = el('div', 'bc-options', undefined, guideBtn, ...lessonGroups);
 
       // Side choice
       const sideBtns: Record<Color, HTMLButtonElement> = { w: null!, b: null! };
@@ -839,6 +1042,7 @@ export function createHud(root: HTMLElement): Hud {
         let choice: MenuChoice;
         const fights = state.fights;
         if (state.mode === 'ai') choice = { mode: 'ai', humanColor: state.humanColor, level: state.level, autoRotate: false, fights };
+        else if (state.mode === 'learn') choice = { mode: 'learn', lesson: state.learnLesson, autoRotate: false, fights };
         else if (state.mode === 'local') choice = { mode: 'local', autoRotate: state.autoRotate, fights };
         else {
           const name = state.playerName;
@@ -856,15 +1060,16 @@ export function createHud(root: HTMLElement): Hud {
         'div',
         'bc-menu__card',
         undefined,
-        el('div', 'bc-modes', { role: 'group', 'aria-label': 'Game mode' }, aiCard, localCard, onlineCard),
+        el('div', 'bc-modes', { role: 'group', 'aria-label': 'Game mode' }, aiCard, localCard, onlineCard, learnCard),
         aiOptions,
+        learnOptions,
         localOptions,
         onlineOptions,
         fightOptions,
         introOptions,
         soundOptions,
         deployBtn,
-        creditsBtn,
+        el('div', 'bc-menu__links', undefined, button('bc-credits-link', 'How to play', () => void showGuide()), creditsBtn),
       );
 
       const menu = el(
@@ -881,7 +1086,7 @@ export function createHud(root: HTMLElement): Hud {
         card,
       );
 
-      function setMode(m: 'ai' | 'local' | 'online'): void {
+      function setMode(m: Saved['mode']): void {
         state.mode = m;
         sync();
       }
@@ -893,6 +1098,10 @@ export function createHud(root: HTMLElement): Hud {
         aiOptions.hidden = state.mode !== 'ai';
         localOptions.hidden = state.mode !== 'local';
         onlineOptions.hidden = state.mode !== 'online';
+        learnCard.setAttribute('aria-pressed', String(state.mode === 'learn'));
+        learnOptions.hidden = state.mode !== 'learn';
+        for (const b of lessonBtns) b.setAttribute('aria-pressed', String(b.dataset.lesson === state.learnLesson));
+        deployBtn.textContent = state.mode === 'learn' ? 'Start lesson!' : 'Deploy!';
         for (const b of actionBtns) b.setAttribute('aria-pressed', String(b.dataset.action === state.onlineAction));
         createPane.hidden = state.onlineAction !== 'create';
         joinPane.hidden = state.onlineAction !== 'join';
@@ -1198,6 +1407,20 @@ export function createHud(root: HTMLElement): Hud {
     return { close, cancelled };
   }
 
+  function setCoach(state: CoachState | null): void {
+    coach.hidden = state === null;
+    undoBtn.hidden = state !== null || !drawBtn.hidden;
+    resignBtn.hidden = state !== null;
+    resetResign();
+    if (state) {
+      coachKicker.textContent = state.kicker;
+      coachTitle.textContent = state.title;
+      coachText.textContent = state.text;
+      coach.dataset.mood = state.mood;
+    }
+    queueInsets();
+  }
+
   function setOnlineMode(online: boolean): void {
     undoBtn.hidden = online;
     drawBtn.hidden = !online;
@@ -1364,6 +1587,11 @@ export function createHud(root: HTMLElement): Hud {
     introMode: () => loadSaved().intro,
     showLobby,
     setOnlineMode,
+    setCoach,
+    onCoachAction: (cb) => void coachCbs.push(cb),
+    showLessonIntro,
+    showLessonDone,
+    showGuide,
     setOpponentStatus,
     onResign: (cb) => void resignCbs.push(cb),
     onOfferDraw: (cb) => void drawCbs.push(cb),

@@ -3,6 +3,7 @@ import type { GameOverReason, GameResult, ServerMessage, Snapshot } from '../../
 import type { Engine } from '../ai/types';
 import { audio, sfx } from '../audio';
 import { Game, type PlayedMove } from '../core/game';
+import { LESSON_GROUPS, lessonById, lessonText, markLessonDone, nextLesson, type Lesson } from '../core/lessons';
 import type { Color, MoveTarget, Square } from '../core/types';
 import data from '../data/pieces.json';
 import { OnlineClient, type ConnectionState } from '../net/client';
@@ -13,6 +14,9 @@ import type { Hud, IntroMode, MenuChoice, OnlineRequest } from '../ui/types';
 const INTRO_LOAD_TIMEOUT_MS = 30_000;
 /** Minimum time the AI appears to think, so its replies don't feel instant. */
 const MIN_AI_DELAY_MS = 450;
+/** Training: pause before a scripted reply, and how long praise or a correction stays up. */
+const LESSON_REPLY_DELAY_MS = 900;
+const LESSON_OOPS_MS = 2600;
 
 const RESULT_TEXT: Record<GameOverReason, string> = {
   checkmate: 'by checkmate.',
@@ -27,6 +31,16 @@ const RESULT_TEXT: Record<GameOverReason, string> = {
 
 const factionName = (c: Color) => data.factions[c].name;
 const other = (c: Color): Color => (c === 'w' ? 'b' : 'w');
+
+interface LessonRun {
+  lesson: Lesson;
+  /** Index into lesson.steps of the move the student is looking for. */
+  step: number;
+  /** Scripted moves or the end-of-lesson card are playing; the student can't move. */
+  busy: boolean;
+  /** Bumped on restart/exit so pending timers from an old run do nothing. */
+  token: number;
+}
 
 interface OnlineSession {
   net: OnlineClient;
@@ -48,6 +62,8 @@ export class Controller {
   private aiToken = 0;
   private viewSide: Color = 'w';
   private online: OnlineSession | null = null;
+  private lesson: LessonRun | null = null;
+  private lessonToken = 0;
   /** Serialises move animations so moves arriving from the network never overlap. */
   private animQueue: Promise<void> = Promise.resolve();
 
@@ -62,6 +78,7 @@ export class Controller {
     hud.onFlip(() => this.setView(other(this.viewSide), true));
     hud.onMenu(() => void this.openMenu());
     hud.onResign(() => this.forfeit());
+    hud.onCoachAction((a) => this.onCoachAction(a));
     hud.onOfferDraw(() => {
       if (!this.online?.started || this.online.over) return;
       this.online.net.send({ t: 'offerDraw' });
@@ -92,11 +109,13 @@ export class Controller {
     this.inMenu = true;
     this.stopAi();
     this.leaveOnline();
+    this.endLesson();
     audio.music('menu');
     this.choice = await this.hud.showMenu();
     this.inMenu = false;
     this.board.setFightMode(this.choice.fights);
     if (this.choice.mode === 'online' && this.choice.online) void this.startOnline(this.choice.online);
+    else if (this.choice.mode === 'learn') void this.startLesson(this.choice.lesson ?? '');
     else this.newGame();
   }
 
@@ -116,6 +135,7 @@ export class Controller {
 
   /** The side the local player controls, or null if they control both (local 2P). */
   private humanSide(): Color | null {
+    if (this.lesson) return this.lesson.lesson.side;
     if (this.choice.mode === 'ai') return this.choice.humanColor ?? 'w';
     if (this.choice.mode === 'online') return this.online?.side ?? null;
     return null;
@@ -123,6 +143,7 @@ export class Controller {
 
   private isHumanTurn(): boolean {
     if (this.forfeited) return false;
+    if (this.lesson?.busy) return false;
     if (this.choice.mode === 'online' && (!this.online?.started || this.online.over)) return false;
     const side = this.humanSide();
     return side === null || this.game.turn === side;
@@ -145,7 +166,7 @@ export class Controller {
       this.online.net.send({ t: 'resign' });
       return;
     }
-    if (this.inMenu || this.forfeited || this.game.outcome().over) return;
+    if (this.inMenu || this.lesson || this.forfeited || this.game.outcome().over) return;
     this.forfeited = true;
     this.stopAi();
     this.clearSelection();
@@ -160,6 +181,8 @@ export class Controller {
       void this.humanMove(this.selected, square);
       return;
     }
+    // Lessons: tapping the selected (often hinted) piece again keeps it selected instead of dropping it.
+    if (this.lesson && square === this.selected) return;
     const piece = this.game.pieceAt(square);
     if (piece && piece.color === this.game.turn && square !== this.selected) {
       this.selected = square;
@@ -178,6 +201,7 @@ export class Controller {
     const played = this.game.move(from, to, promotion);
     this.clearSelection();
     if (!played) return;
+    if (this.lesson && !this.lessonAccepts(played)) return;
     // Online: apply locally right away; the server's echo of this move is ignored as an ack.
     this.online?.net.send({ t: 'move', uci: played.uci, ply: this.game.ply - 1 });
     await this.play(played);
@@ -199,6 +223,15 @@ export class Controller {
     this.syncBoardMarks();
     this.refreshHud();
     const outcome = this.game.outcome();
+    if (this.lesson) {
+      const checked = this.game.checkSquare();
+      if (checked && !outcome.over) {
+        this.hud.showBanner('CHECK!', 'check');
+        sfx('check');
+        this.board.showCheck(checked);
+      }
+      return;
+    }
     // Online results come from the server's gameOver message instead.
     if (outcome.over && !this.online) {
       void this.showResult(
@@ -254,7 +287,7 @@ export class Controller {
   }
 
   private undo(): void {
-    if (this.animating || this.online || this.forfeited || this.game.ply === 0) return;
+    if (this.animating || this.online || this.lesson || this.forfeited || this.game.ply === 0) return;
     this.stopAi();
     sfx('undo');
     if (this.choice.mode === 'ai') {
@@ -306,6 +339,152 @@ export class Controller {
       session.net.send({ t: 'rematch' });
       this.hud.showBanner('Rematch requested…', 'info', 2500);
     } else this.newGame();
+  }
+
+  // --- Training ---
+
+  private async startLesson(id: string): Promise<void> {
+    const lesson = lessonById(id);
+    if (!lesson) {
+      await this.openMenu();
+      return;
+    }
+    this.stopAi();
+    this.forfeited = false;
+    const token = ++this.lessonToken;
+    const run: LessonRun = { lesson, step: 0, busy: true, token };
+    this.lesson = run;
+    this.animQueue = Promise.resolve();
+    this.animating = false;
+    this.game = new Game(lesson.fen);
+    this.clearSelection();
+    this.board.setPosition(this.game.pieces());
+    this.board.setLastMove(null, null);
+    this.board.setCheck(null);
+    this.setView(lesson.side, true);
+    this.refreshHud();
+    audio.music('battle');
+    this.coach(run, 'task', lessonText(lesson.steps[0].say));
+    await this.hud.showLessonIntro(this.lessonKicker(lesson), lesson.title, lesson.intro);
+    if (this.lesson !== run || run.token !== token) return;
+    for (const uci of lesson.setup ?? []) {
+      await this.pause(LESSON_REPLY_DELAY_MS / 2);
+      if (run.token !== this.lessonToken) return;
+      const played = this.game.moveUci(uci);
+      if (played) await this.play(played);
+    }
+    if (run.token !== this.lessonToken) return;
+    run.busy = false;
+  }
+
+  /** Checks a legal move the student just made against the lesson. Wrong moves are taken back. */
+  private lessonAccepts(played: PlayedMove): boolean {
+    const run = this.lesson!;
+    const step = run.lesson.steps[run.step];
+    if (step.accept.includes(played.uci)) {
+      run.busy = true;
+      if (run.step < run.lesson.steps.length - 1) this.coach(run, 'good', lessonText(step.praise ?? 'Nice move!'));
+      void this.play(played).then(() => this.lessonStepDone(run));
+      return true;
+    }
+    this.game.undo();
+    sfx('undo');
+    this.coach(run, 'oops', lessonText(step.wrong ?? 'Not quite! That move is legal, but it isn\'t this lesson\'s move. Try again, or tap Hint.'));
+    const token = run.token;
+    const step0 = run.step;
+    window.setTimeout(() => {
+      if (this.lesson === run && run.token === token && run.step === step0 && !run.busy) this.coach(run, 'task', lessonText(step.say));
+    }, LESSON_OOPS_MS);
+    return false;
+  }
+
+  private async lessonStepDone(run: LessonRun): Promise<void> {
+    if (run.token !== this.lessonToken) return; // restarted or left while the move animated
+    const step = run.lesson.steps[run.step];
+    const last = run.step === run.lesson.steps.length - 1;
+    if (last) {
+      await this.finishLesson(run);
+      return;
+    }
+    sfx('promote');
+    await this.pause(step.praise ? LESSON_REPLY_DELAY_MS * 1.6 : LESSON_REPLY_DELAY_MS);
+    if (run.token !== this.lessonToken) return;
+    if (step.reply) {
+      const played = this.game.moveUci(step.reply);
+      if (played) await this.play(played);
+      if (run.token !== this.lessonToken) return;
+    }
+    run.step++;
+    run.busy = false;
+    this.coach(run, 'task', lessonText(run.lesson.steps[run.step].say));
+  }
+
+  private async finishLesson(run: LessonRun): Promise<void> {
+    const token = run.token;
+    const outcome = this.game.outcome();
+    if (outcome.over && outcome.reason === 'checkmate') {
+      this.hud.showBanner('CHECKMATE!', 'mate');
+      sfx('mate');
+      const king = this.game.checkSquare();
+      if (king) await this.board.playCheckmate(king, outcome.winner);
+    } else {
+      this.hud.showBanner('LESSON COMPLETE!', 'info');
+    }
+    if (token !== this.lessonToken) return;
+    sfx('victory');
+    markLessonDone(run.lesson.id);
+    this.coach(run, 'good', 'Lesson complete!');
+    await this.pause(900);
+    if (token !== this.lessonToken) return;
+    const next = nextLesson(run.lesson.id);
+    const choice = await this.hud.showLessonDone(run.lesson.title, run.lesson.done, next !== undefined);
+    if (token !== this.lessonToken) return;
+    if (choice === 'next' && next) void this.startLesson(next.id);
+    else if (choice === 'replay') void this.startLesson(run.lesson.id);
+    else await this.openMenu();
+  }
+
+  private onCoachAction(action: 'hint' | 'restart' | 'guide'): void {
+    const run = this.lesson;
+    if (!run) return;
+    if (action === 'guide') {
+      void this.hud.showGuide();
+      return;
+    }
+    if (action === 'restart') {
+      void this.startLesson(run.lesson.id);
+      return;
+    }
+    if (run.busy || this.animating) return;
+    // Hint: select the piece to move and show only the square it should go to.
+    const uci = run.lesson.steps[run.step].accept[0];
+    const from = uci.slice(0, 2);
+    const to = uci.slice(2, 4);
+    this.selected = from;
+    this.targets = this.game.legalTargets(from).filter((t) => t.square === to);
+    this.board.setSelection(from, this.targets);
+    sfx('select');
+  }
+
+  private coach(run: LessonRun, mood: 'task' | 'good' | 'oops', text: string): void {
+    const n = run.lesson.steps.length;
+    const kicker = n > 1 ? `${this.lessonKicker(run.lesson)} · Step ${Math.min(run.step + 1, n)} of ${n}` : this.lessonKicker(run.lesson);
+    this.hud.setCoach({ kicker, title: run.lesson.title, text, mood });
+  }
+
+  private lessonKicker(lesson: Lesson): string {
+    return LESSON_GROUPS.find((g) => g.id === lesson.group)?.title ?? 'Training';
+  }
+
+  private endLesson(): void {
+    if (!this.lesson) return;
+    this.lesson = null;
+    this.lessonToken++;
+    this.hud.setCoach(null);
+  }
+
+  private pause(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
   }
 
   // --- Online play ---

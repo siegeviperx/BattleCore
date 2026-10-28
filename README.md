@@ -10,7 +10,7 @@ plays an animated 3D fight scene.
 
 - **Design doc:** [docs/DESIGN.md](docs/DESIGN.md)
 - **Technical requirements:** [docs/TECHNICAL_REQUIREMENTS.md](docs/TECHNICAL_REQUIREMENTS.md)
-- **Modes:** vs Computer · Local 2-Player · Online
+- **Modes:** vs Computer · Local 2-Player · Online · Training (How to Play guide + 18 lessons)
 - **Stack:** TypeScript · Vite · Three.js · chess.js · custom alpha-beta AI · Node WebSocket server
 
 ## Status
