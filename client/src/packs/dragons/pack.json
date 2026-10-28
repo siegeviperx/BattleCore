@@ -26,7 +26,10 @@
         "kind": "topple"
       },
       "looks": [
-        {}
+        {
+          "art": "pieces/k.png",
+          "model": "models/k.glb"
+        }
       ]
     },
     "q": {

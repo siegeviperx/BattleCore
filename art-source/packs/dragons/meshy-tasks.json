@@ -1,1 +1,9 @@
-{}
+{
+  "k": {
+    "art": {
+      "kind": "image-to-image",
+      "id": "01a18042-3eab-719c-ad05-554c5c9e688d"
+    },
+    "model": "01a18042-ead4-70b9-8df4-e6dd92eeb5a9"
+  }
+}
