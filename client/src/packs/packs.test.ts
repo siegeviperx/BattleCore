@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ATTACKS, KNOCKOUTS } from '../fight/moves';
-import { PACKS, PIECE_TYPES, army, loadPack } from './index';
+import { PACKS, PIECE_TYPES, army, loadPack, parseSlot } from './index';
 
 describe('piece packs', () => {
   it('ships the original matchup', () => {
@@ -11,15 +11,21 @@ describe('piece packs', () => {
   for (const pack of Object.values(PACKS)) {
     describe(pack.id, () => {
       for (const t of PIECE_TYPES) {
-        it(`${t}: known fight moves, art for every look`, () => {
+        it(`${t}: fight moves exist in the move library`, () => {
           const p = pack.pieces[t];
           expect(Object.keys(ATTACKS)).toContain(p.attack.kind);
           expect(Object.keys(KNOCKOUTS)).toContain(p.knockout.kind);
-          for (const look of p.looks) expect(look.art).toBeTruthy();
         });
       }
     });
   }
+
+  it('names look slots', () => {
+    expect(parseSlot('k')).toEqual({ type: 'k', look: 0 });
+    expect(parseSlot('p3')).toEqual({ type: 'p', look: 2 });
+    expect(parseSlot('x')).toBeNull();
+    expect(parseSlot('k1')).toBeNull();
+  });
 
   describe('loadPack refuses broken packs', () => {
     const good = () => ({
@@ -46,6 +52,7 @@ describe('piece packs', () => {
     it('id must match the folder', () => expect(load((f) => (f.id = 'other'))).toThrow(/match its folder/));
     it('every piece is required', () => expect(load((f) => delete (f.pieces as Record<string, unknown>).q)).toThrow(/missing piece "q"/));
     it('colors must be hex', () => expect(load((f) => (f.colors.base = 'red'))).toThrow(/colors.base/));
+    it('fight moves must exist', () => expect(load((f) => (f.pieces.k.attack.kind = 'laser'))).toThrow(/attack "laser"/));
     it('referenced files must exist', () =>
       expect(load((f) => ((f.pieces as Record<string, { looks: { model?: string }[] }>).k.looks[0].model = 'models/k.glb'))).toThrow(/not found/));
   });

@@ -12,3 +12,6 @@ art-source/models/raw/
 
 # Kenney CC0 source packs (re-download from kenney.nl); picked sounds are copied into client/public/assets/audio
 art-source/audio/packs/
+
+# Pack tool: raw Meshy downloads (re-download with the task IDs in art-source/packs/<id>/meshy-tasks.json)
+art-source/packs/*/raw/

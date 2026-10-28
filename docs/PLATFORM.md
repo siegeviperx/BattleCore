@@ -120,6 +120,10 @@ Every missing piece of a pack still plays:
 
 ### 3.5 Pack tool (`npm run pack:*`)
 
+> **Status: built (P2 step 1).** `tools/pack/` (run from the repo root). How to use it: [PACKS.md](PACKS.md).
+> Commands take their arguments after `--`, e.g. `npm run pack:piece -- dragons k --prompt "…"`.
+> Dev builds take `?white=<pack>&black=<pack>` to try any matchup; CI runs `pack:check` on every pull request.
+
 This automates the steps that were done by hand for the Baby Army:
 
 ```sh

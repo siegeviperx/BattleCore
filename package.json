@@ -1,0 +1,23 @@
+{
+  "name": "battlecore-tools",
+  "private": true,
+  "type": "module",
+  "description": "Developer tools for BattleCore (the game itself lives in client/ and server/).",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "pack": "node tools/pack/cli.ts",
+    "pack:new": "node tools/pack/cli.ts new",
+    "pack:piece": "node tools/pack/cli.ts piece",
+    "pack:check": "node tools/pack/cli.ts check",
+    "pack:preview": "node tools/pack/cli.ts preview",
+    "pack:balance": "node tools/pack/cli.ts balance",
+    "typecheck": "tsc --noEmit -p tools"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "4.5.1",
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
+}
