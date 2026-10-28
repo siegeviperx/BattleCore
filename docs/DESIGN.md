@@ -95,7 +95,7 @@ not real mesh morphs.
 ### Rules
 - Full standard chess (FIDE): castling, en passant, promotion (choose piece), check/checkmate,
   stalemate, threefold repetition, 50-move rule, insufficient material.
-- Rules engine: **chess.js** (BSD-2). Every move is checked by it, and online the server checks too.
+- Rules engine: our own, in `shared/rules/` (it began as the AI's move generator). Every move is checked by it, and online the server checks too. chess.js is kept only as a test reference.
 - **Captures always succeed**: the capturing piece always wins the fight (fights are cosmetic).
 
 ### Board & pieces
@@ -158,7 +158,7 @@ The opponent's move is never delayed by the other player's fight animation.
 > Clocks, quick-match, and resuming after a page reload are not built yet.
 
 - **Architecture:** a Node.js game server running WebSockets. It keeps the official game state and
-  checks every move with chess.js. Clients only send move requests.
+  checks every move with the shared rules engine. Clients only send move requests.
 - **Rooms:** host makes a room and gets a 6-character code; friend joins with the code.
 - **Reconnects:** a dropped player can rejoin within 60 s; game resumes from server state.
 - **Later:** quick-match queue, accounts, Elo rating, spectators.
@@ -194,7 +194,7 @@ problem on any platform, and it can have per-faction personality.
 | Build | Vite |
 | 3D rendering | Three.js |
 | Animation | Three.js AnimationMixer (GLB clips) + a tweening library for camera and UI |
-| Chess rules | chess.js |
+| Chess rules | Own engine in `shared/rules/` (cross-checked against chess.js) |
 | AI | Custom alpha-beta engine (TypeScript, Web Worker) |
 | Networking | Node.js + `ws` (or Colyseus if rooms grow complex) |
 | Assets | Meshy (image → 3D, rigging, animation) + Blender (cleanup, materials, sprite renders) |
@@ -214,7 +214,7 @@ that rewrite small:
 ```
 /client         Vite + Three.js game
   /src
-    /core       game state, chess.js wrapper, mode controllers
+    /core       game state, rules wrapper, mode controllers
     /render     scene, board, pieces, camera
     /cutscene   intro timeline runner
     /fight      fight-scene director

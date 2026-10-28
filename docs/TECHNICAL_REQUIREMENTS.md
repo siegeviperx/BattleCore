@@ -128,7 +128,8 @@ A crashed or cancelled worker is recreated on the next request.
 
 ### 4.1 Chess core (`client/src/core`)
 
-- Standard chess rules via **chess.js**: castling, en passant, promotion (player chooses Q/R/B/N),
+- Standard chess rules via the **shared rules engine** (`shared/rules/`, used by the client, AI and server;
+  cross-checked against chess.js in tests): castling, en passant, promotion (player chooses Q/R/B/N),
   check, checkmate, stalemate, threefold repetition, insufficient material and the fifty-move rule.
 - Game logic **never imports rendering code** (this keeps a future engine port small; see DESIGN.md §9).
 - Pawn looks are assigned by **starting file** (`pieces.json` `looks`, `core/looks.ts`), so a pawn
@@ -205,7 +206,7 @@ Resuming an online game after a page reload is **(not built)**.
 
 ### 5.2 Server guarantees (`server/`)
 
-- **The server is authoritative.** It validates every move with chess.js; clients only send requests.
+- **The server is authoritative.** It validates every move with the shared rules engine; clients only send requests.
 - **Reconnects:** a dropped player's seat is held for **60 s** (`RECONNECT_GRACE_MS`). After that the
   player forfeits (`abandon`).
 - **Limits:** messages are 4 KB at most, text frames only, and 20 messages per second per connection

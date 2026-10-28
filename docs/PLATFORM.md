@@ -230,6 +230,10 @@ the AI, the board's hazard mask is fixed input loaded from `board.json`. Moves s
 
 ## 5. Rules Engine: Replacing chess.js
 
+> **Status: done (P1 step 1).** `shared/rules/board.ts` (move generator) and `shared/rules/game.ts` (SAN, FEN,
+> history, endings) now run the client, AI and server. `client/src/core/rules.test.ts` cross-checks them against
+> chess.js on random games (60 by default, `RULES_GAMES=1000` for a deep run). chess.js is a dev dependency only.
+
 Hazards in online play mean the **server** must know the hazard rules. chess.js can't model them, so
 the game moves onto one rules engine of its own.
 

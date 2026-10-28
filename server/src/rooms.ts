@@ -1,6 +1,5 @@
-// Transport-agnostic room / game logic. The server owns the only authoritative chess.js
-// instance per room; clients only send intents.
-import { Chess, DEFAULT_POSITION } from 'chess.js';
+// Transport-agnostic room / game logic. The server owns the only authoritative game per room (the shared rules
+// engine, the same one the client runs); clients only send intents.
 import { randomBytes, randomInt } from 'node:crypto';
 import {
   RECONNECT_GRACE_MS,
@@ -16,6 +15,7 @@ import type {
   Side,
   Snapshot,
 } from '../../shared/protocol.ts';
+import { ChessGame, START_FEN } from '../../shared/rules/game.ts';
 
 /** One connected client, as seen by the room logic. */
 export interface Peer {
@@ -38,7 +38,7 @@ const other = (s: Side): Side => (s === 'w' ? 'b' : 'w');
 
 export class Room {
   readonly code: string;
-  chess = new Chess();
+  chess = new ChessGame();
   moves: string[] = [];
   players: Player[] = [];
   started = false;
@@ -66,7 +66,7 @@ export class Room {
     return {
       code: this.code,
       you: p.side,
-      startFen: DEFAULT_POSITION,
+      startFen: START_FEN,
       moves: [...this.moves],
       opponentConnected: !!opp?.peer,
       started: this.started,
@@ -209,28 +209,21 @@ export class RoomManager {
     };
     if (!room.started) return fail('bad-request', 'Game has not started');
     if (room.result) return fail('game-over', 'Game is over');
-    if (room.chess.turn() !== player.side) return fail('not-your-turn', 'Not your turn');
+    if (room.chess.turn !== player.side) return fail('not-your-turn', 'Not your turn');
     if (ply !== room.moves.length) return fail('bad-request', `Stale ply ${ply}, expected ${room.moves.length}`);
-    const m = UCI_RE.exec(uci);
-    if (!m) return fail('illegal-move', `Malformed move ${uci}`);
-    const [, from, to, promo] = m;
-    const legal = room.chess
-      .moves({ verbose: true })
-      .find((x) => x.from === from && x.to === to && (x.promotion ?? undefined) === promo);
-    if (!legal) return fail('illegal-move', `Illegal move ${uci}`);
-    const done = room.chess.move({ from: legal.from, to: legal.to, promotion: legal.promotion });
+    if (!UCI_RE.test(uci)) return fail('illegal-move', `Malformed move ${uci}`);
+    const done = room.chess.move(uci);
+    if (!done) return fail('illegal-move', `Illegal move ${uci}`);
     room.moves.push(uci);
     room.drawOfferFrom = null;
     room.broadcast({ t: 'moved', uci, san: done.san, ply: room.moves.length - 1 });
 
-    const c = room.chess;
-    let result: GameResult | null = null;
-    if (c.isCheckmate()) result = { winner: player.side, reason: 'checkmate' };
-    else if (c.isStalemate()) result = { winner: 'draw', reason: 'stalemate' };
-    else if (c.isInsufficientMaterial()) result = { winner: 'draw', reason: 'insufficient' };
-    else if (c.isThreefoldRepetition()) result = { winner: 'draw', reason: 'repetition' };
-    else if (c.isDrawByFiftyMoves()) result = { winner: 'draw', reason: 'fifty-move' };
-    if (result) this.finish(room, result);
+    const outcome = room.chess.outcome();
+    if (outcome.over) {
+      const result: GameResult =
+        outcome.reason === 'checkmate' ? { winner: outcome.winner, reason: 'checkmate' } : { winner: 'draw', reason: outcome.reason };
+      this.finish(room, result);
+    }
   }
 
   private requireActive(room: Room, player: Player): boolean {
@@ -269,7 +262,7 @@ export class RoomManager {
       opp.peer?.send({ t: 'rematchOffered' });
       return;
     }
-    room.chess = new Chess();
+    room.chess = new ChessGame();
     room.moves = [];
     room.result = null;
     room.drawOfferFrom = null;
