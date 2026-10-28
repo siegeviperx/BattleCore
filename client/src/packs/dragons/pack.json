@@ -1,0 +1,122 @@
+{
+  "id": "dragons",
+  "version": 1,
+  "name": "Dragon Clans",
+  "short": "Dragons",
+  "colors": {
+    "primary": "#1f6b63",
+    "secondary": "#d9a93a",
+    "base": "#203a3a",
+    "emblem": "star"
+  },
+  "credits": [
+    {
+      "role": "3D models & art",
+      "name": "Meshy AI"
+    }
+  ],
+  "pieces": {
+    "k": {
+      "name": "Elder Wyrm",
+      "icon": "🐉",
+      "attack": {
+        "kind": "breath"
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {}
+      ]
+    },
+    "q": {
+      "name": "Storm Queen",
+      "icon": "⚡",
+      "attack": {
+        "kind": "volley",
+        "count": 3,
+        "projectile": "ball",
+        "color": "#7fd3ff",
+        "arc": 0.6
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {}
+      ]
+    },
+    "r": {
+      "name": "Dragon Roost",
+      "icon": "🗼",
+      "attack": {
+        "kind": "volley",
+        "count": 2,
+        "projectile": "ball",
+        "color": "#ff7a1a",
+        "arc": 1.2,
+        "windup": "roar"
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {}
+      ]
+    },
+    "b": {
+      "name": "Wyvern Sage",
+      "icon": "🧙",
+      "attack": {
+        "kind": "snipe"
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {}
+      ]
+    },
+    "n": {
+      "name": "Wyvern Rider",
+      "icon": "🪽",
+      "attack": {
+        "kind": "dive",
+        "strafe": {
+          "shots": 4,
+          "projectile": "dart",
+          "color": "#ffd166"
+        }
+      },
+      "knockout": {
+        "kind": "launch"
+      },
+      "looks": [
+        {
+          "tuning": {
+            "flier": false
+          }
+        }
+      ]
+    },
+    "p": {
+      "name": "Hatchling",
+      "icon": "🥚",
+      "attack": {
+        "kind": "burst",
+        "shots": 3,
+        "projectile": "dart",
+        "color": "#ffd166"
+      },
+      "knockout": {
+        "kind": "pratfall"
+      },
+      "looks": [
+        {},
+        {},
+        {},
+        {}
+      ]
+    }
+  }
+}
