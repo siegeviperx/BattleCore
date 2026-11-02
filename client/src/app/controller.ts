@@ -5,8 +5,8 @@ import { audio, sfx } from '../audio';
 import { Game, type PlayedMove } from '../core/game';
 import { LESSON_GROUPS, lessonById, lessonText, markLessonDone, nextLesson, type Lesson } from '../core/lessons';
 import type { Color, MoveTarget, Square } from '../core/types';
-import data from '../data/pieces.json';
 import { OnlineClient, type ConnectionState } from '../net/client';
+import { DEFAULT_MATCHUP, army, getMatchup, setMatchup } from '../packs';
 import type { BoardView } from '../render/types';
 import type { Hud, IntroMode, MenuChoice, OnlineRequest } from '../ui/types';
 
@@ -29,7 +29,7 @@ const RESULT_TEXT: Record<GameOverReason, string> = {
   agreement: 'Both sides agreed to a truce.',
 };
 
-const factionName = (c: Color) => data.factions[c].name;
+const factionName = (c: Color) => army(c).name;
 const other = (c: Color): Color => (c === 'w' ? 'b' : 'w');
 
 interface LessonRun {
@@ -88,7 +88,10 @@ export class Controller {
 
   async start(): Promise<void> {
     // The intro cinematic opens the app (per the menu's intro setting, or ?intro=1 / ?intro=0), before the menu.
-    if (shouldPlayIntro(this.hud.introMode())) {
+    // The intro stars the Baby Army and the Dinos, so it only plays for that matchup (no generic intro yet).
+    const m = getMatchup();
+    const introArmies = m.w === DEFAULT_MATCHUP.w && m.b === DEFAULT_MATCHUP.b;
+    if (introArmies && shouldPlayIntro(this.hud.introMode())) {
       // Browsers only start audio after a tap or key press, so the intro waits behind a title card.
       const loaded = Promise.race([this.board.introReady(), new Promise<void>((r) => setTimeout(r, INTRO_LOAD_TIMEOUT_MS))]);
       await this.hud.showStart(loaded);
@@ -113,6 +116,7 @@ export class Controller {
     audio.music('menu');
     this.choice = await this.hud.showMenu();
     this.inMenu = false;
+    if (this.choice.matchup) setMatchup(this.choice.matchup); // online games take theirs from the server
     this.board.setFightMode(this.choice.fights);
     if (this.choice.mode === 'online' && this.choice.online) void this.startOnline(this.choice.online);
     else if (this.choice.mode === 'learn') void this.startLesson(this.choice.lesson ?? '');
@@ -122,6 +126,8 @@ export class Controller {
   private newGame(fen?: string): void {
     this.stopAi();
     this.forfeited = false;
+    this.animQueue = Promise.resolve();
+    this.animating = false;
     this.game = new Game(fen);
     this.clearSelection();
     this.board.setPosition(this.game.pieces());
@@ -130,6 +136,7 @@ export class Controller {
     this.setView(this.humanSide() ?? 'w', true);
     this.refreshHud();
     audio.music('battle');
+    this.hud.showPieceHint();
     void this.maybeAiMove();
   }
 
@@ -201,21 +208,32 @@ export class Controller {
     const played = this.game.move(from, to, promotion);
     this.clearSelection();
     if (!played) return;
-    if (this.lesson && !this.lessonAccepts(played)) return;
+    if (this.lesson) {
+      this.lessonMove(played); // plays it if it's the lesson's move
+      return;
+    }
     // Online: apply locally right away; the server's echo of this move is ignored as an ack.
     this.online?.net.send({ t: 'move', uci: played.uci, ply: this.game.ply - 1 });
     await this.play(played);
   }
 
   private play(played: PlayedMove): Promise<void> {
-    this.animQueue = this.animQueue.then(async () => {
-      this.animating = true;
-      this.hud.setUndoEnabled(false);
-      this.board.setCheck(null);
-      await this.board.animateMove(played.anim);
-      this.animating = false;
-      this.afterMove();
-    });
+    this.animQueue = this.animQueue
+      .then(async () => {
+        this.animating = true;
+        this.hud.setUndoEnabled(false);
+        this.board.setCheck(null);
+        try {
+          await this.board.animateMove(played.anim);
+        } catch (err) {
+          // A broken animation must never freeze the game: snap the board to the real position and carry on.
+          console.error(err);
+          this.board.setPosition(this.game.pieces());
+        }
+        this.animating = false;
+        this.afterMove();
+      })
+      .catch((err) => console.error(err)); // a rejected queue would silently swallow every later move
     return this.animQueue;
   }
 
@@ -276,6 +294,9 @@ export class Controller {
         this.hud.setThinking(false);
         console.error(err);
         this.hud.showBanner('AI malfunction!', 'info');
+        // Never leave the player waiting on a broken engine: the AI plays any legal move instead.
+        const fallback = this.game.randomMove();
+        if (fallback) await this.play(fallback);
       }
     }
   }
@@ -377,15 +398,15 @@ export class Controller {
     run.busy = false;
   }
 
-  /** Checks a legal move the student just made against the lesson. Wrong moves are taken back. */
-  private lessonAccepts(played: PlayedMove): boolean {
+  /** Checks a legal move the student just made against the lesson: plays it if right, takes it back if wrong. */
+  private lessonMove(played: PlayedMove): void {
     const run = this.lesson!;
     const step = run.lesson.steps[run.step];
     if (step.accept.includes(played.uci)) {
       run.busy = true;
       if (run.step < run.lesson.steps.length - 1) this.coach(run, 'good', lessonText(step.praise ?? 'Nice move!'));
       void this.play(played).then(() => this.lessonStepDone(run));
-      return true;
+      return;
     }
     this.game.undo();
     sfx('undo');
@@ -395,7 +416,6 @@ export class Controller {
     window.setTimeout(() => {
       if (this.lesson === run && run.token === token && run.step === step0 && !run.busy) this.coach(run, 'task', lessonText(step.say));
     }, LESSON_OOPS_MS);
-    return false;
   }
 
   private async lessonStepDone(run: LessonRun): Promise<void> {
@@ -505,7 +525,8 @@ export class Controller {
     }
     if (this.online !== session) return;
     const name = request.name || undefined;
-    net.send(request.action === 'create' ? { t: 'create', side: request.side, name } : { t: 'join', code: request.code, name });
+    const army = request.army || undefined;
+    net.send(request.action === 'create' ? { t: 'create', side: request.side, name, army } : { t: 'join', code: request.code, name, army });
   }
 
   private showLobby(session: OnlineSession, code: string | null): void {
@@ -585,6 +606,7 @@ export class Controller {
     this.closeLobby();
     this.animQueue = Promise.resolve();
     this.animating = false;
+    setMatchup(s.armies ?? {}); // both players see the same armies; unknown ones (a newer friend's pack) fall back
     this.game = new Game(s.startFen);
     for (const uci of s.moves) this.game.moveUci(uci);
     this.clearSelection();
@@ -596,6 +618,7 @@ export class Controller {
     this.hud.setOpponentStatus(s.opponentConnected ? 'connected' : 'disconnected', other(s.you), session.opponentName);
     if (s.moves.length === 0) {
       this.hud.showBanner(s.you === 'w' ? 'You move first!' : 'Enemy moves first', 'info');
+      this.hud.showPieceHint();
     }
     if (s.drawOffered) this.onServerMessage(session, { t: 'drawOffered' });
   }

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { lookCount, lookKey } from '../core/looks';
 import type { Color, PieceType } from '../core/types';
-import data from '../data/pieces.json';
+import { GLYPHS, SHADOW_SHADE, army, lookCount, pieceInfo, pieceLook } from '../packs';
 
 /** Logical canvas size (drawn at 2× for crispness). */
 const W = 256;
@@ -27,7 +26,7 @@ export interface Cutout {
 const cache = new Map<string, Cutout>();
 
 export function getCutout(color: Color, type: PieceType, look = 0): Cutout {
-  const key = lookKey(color, type, look);
+  const key = `${army(color).key}-${type}-${look % lookCount(color, type)}`;
   let c = cache.get(key);
   if (!c) {
     c = drawCutout(color, type, look);
@@ -37,7 +36,7 @@ export function getCutout(color: Color, type: PieceType, look = 0): Cutout {
 }
 
 export function hasArt(color: Color, type: PieceType): boolean {
-  return Boolean((data.pieces[color][type] as { art?: string }).art);
+  return pieceLook(color, type).art !== null;
 }
 
 /** True if the sticker is opaque at texture uv (three.js uv, v up). */
@@ -65,9 +64,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 function drawCutout(color: Color, type: PieceType, look: number): Cutout {
-  const faction = data.factions[color];
-  const piece = data.pieces[color][type];
-  const glyph = data.glyphs[type];
+  const faction = { ...army(color), ...army(color).colors };
+  const piece = pieceInfo(color, type);
+  const glyph = GLYPHS[type];
 
   const cv = document.createElement('canvas');
   cv.width = W * SCALE;
@@ -163,6 +162,7 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
   ctx.fillText(label, W / 2, bannerY + bannerH / 2 + 1);
   ctx.restore();
 
+  if (army(color).shadow) darken(ctx);
   drawGlyphBadge(ctx, color, glyph, ix + 26, iy + 26, 1);
 
   const texture = new THREE.CanvasTexture(cv);
@@ -171,19 +171,29 @@ function drawCutout(color: Color, type: PieceType, look: number): Cutout {
   const cutout: Cutout = { texture, ...buildMask(ctx, cv) };
 
   // Real sticker art replaces the placeholder once it has loaded.
-  const art = lookCount(color, type) > 1 ? `pieces/${lookKey(color, type, look)}.png` : (piece as { art?: string }).art;
+  const art = pieceLook(color, type, look).art;
   if (art) {
     const img = new Image();
     img.onload = () => {
       ctx.clearRect(0, 0, W, H);
       ctx.drawImage(img, 0, 0, W, H);
+      if (army(color).shadow) darken(ctx);
       drawGlyphBadge(ctx, color, glyph, 30, 30, 0.8);
       texture.needsUpdate = true;
       Object.assign(cutout, buildMask(ctx, cv));
     };
-    img.src = `${import.meta.env.BASE_URL}assets/${art}`;
+    img.src = art;
   }
   return cutout;
+}
+
+/** Mirror matches: the second army's sticker is drawn darker (border included) so the sides stay apart. */
+function darken(ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = `rgba(34, 12, 58, ${1 - SHADOW_SHADE + 0.1})`; // dark purple, matching the shadow bases
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
 }
 
 /** Chess glyph corner badge, so chess players always recognise the role. */
@@ -237,11 +247,11 @@ function buildMask(ctx: CanvasRenderingContext2D, cv: HTMLCanvasElement): Omit<C
 }
 
 /** Top-cap texture for a faction base: base colour + white emblem. */
-const baseCache = new Map<Color, THREE.CanvasTexture>();
+const baseCache = new Map<string, THREE.CanvasTexture>();
 export function getBaseTopTexture(color: Color): THREE.CanvasTexture {
-  let t = baseCache.get(color);
+  let t = baseCache.get(army(color).key);
   if (t) return t;
-  const f = data.factions[color];
+  const f = { ...army(color).colors, baseEmblem: army(color).colors.emblem };
   const S = 256;
   const cv = document.createElement('canvas');
   cv.width = cv.height = S;
@@ -293,6 +303,6 @@ export function getBaseTopTexture(color: Color): THREE.CanvasTexture {
   t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
-  baseCache.set(color, t);
+  baseCache.set(army(color).key, t);
   return t;
 }

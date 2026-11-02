@@ -241,13 +241,13 @@
       "side": "b",
       "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       "setup": ["f2f3"],
-      "intro": "Fool's Mate is the fastest checkmate possible. This time you play the Dinos! Watch what happens when someone weakens their king too early.",
+      "intro": "Fool's Mate is the fastest checkmate possible. This time you play the {b}! Watch what happens when someone weakens their king too early.",
       "steps": [
         {
-          "say": "The Babies moved a pawn beside their king. Open a path for your {b.q}: move the pawn in front of your {b.k} forward.",
+          "say": "The {w} moved a pawn beside their king. Open a path for your {b.q}: move the pawn in front of your {b.k} forward.",
           "accept": ["e7e5", "e7e6"],
           "reply": "g2g4",
-          "praise": "Good! Now watch the Babies make another weak move that opens a path to their king."
+          "praise": "Good! Now watch the {w} make another weak move that opens a path to their king."
         },
         {
           "say": "Swoop your {b.q} down that diagonal to the edge of the board. Checkmate!",

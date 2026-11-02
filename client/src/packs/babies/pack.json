@@ -1,0 +1,155 @@
+{
+  "id": "babies",
+  "version": 1,
+  "name": "Baby Army",
+  "short": "Babies",
+  "colors": {
+    "primary": "#5f6b3c",
+    "secondary": "#c9b27c",
+    "base": "#1c1c1c",
+    "emblem": "star"
+  },
+  "credits": [
+    {
+      "role": "3D models & art",
+      "name": "Meshy AI"
+    }
+  ],
+  "pieces": {
+    "k": {
+      "name": "Baby Commander",
+      "icon": "🤴",
+      "attack": {
+        "kind": "volley",
+        "count": 1,
+        "projectile": "bottle",
+        "color": "#f6f4ee",
+        "arc": 1.1,
+        "windup": "command"
+      },
+      "knockout": {
+        "kind": "pratfall"
+      },
+      "looks": [
+        {
+          "art": "pieces/k.png",
+          "model": "models/k.glb"
+        }
+      ]
+    },
+    "q": {
+      "name": "Caped Baby Queen",
+      "icon": "👸",
+      "attack": {
+        "kind": "twirl",
+        "turns": 2,
+        "shots": 4,
+        "projectile": "dart",
+        "color": "#e0479e"
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {
+          "art": "pieces/q.png",
+          "model": "models/q.glb"
+        }
+      ]
+    },
+    "r": {
+      "name": "Baby Watchtower",
+      "icon": "🏰",
+      "attack": {
+        "kind": "volley",
+        "count": 3,
+        "projectile": "ball",
+        "color": "#2a2a2e",
+        "arc": 0.7
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {
+          "art": "pieces/r.png",
+          "model": "models/r.glb"
+        }
+      ]
+    },
+    "b": {
+      "name": "Sniper Baby",
+      "icon": "🎯",
+      "attack": {
+        "kind": "snipe",
+        "projectile": "dart",
+        "color": "#ff7a1a"
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {
+          "art": "pieces/b.png",
+          "model": "models/b.glb"
+        }
+      ]
+    },
+    "n": {
+      "name": "Jetpack Baby",
+      "icon": "🚀",
+      "attack": {
+        "kind": "dive",
+        "strafe": {
+          "shots": 4,
+          "projectile": "dart",
+          "color": "#2a6fdb"
+        }
+      },
+      "knockout": {
+        "kind": "launch"
+      },
+      "looks": [
+        {
+          "art": "pieces/n.png",
+          "model": "models/n.glb"
+        }
+      ]
+    },
+    "p": {
+      "name": "Baby Rifleman",
+      "icon": "👶",
+      "attack": {
+        "kind": "burst",
+        "shots": 3,
+        "projectile": "dart",
+        "color": "#ff7a1a",
+        "then": "tackle"
+      },
+      "knockout": {
+        "kind": "pratfall"
+      },
+      "looks": [
+        {
+          "art": "pieces/p.png",
+          "model": "models/p.glb",
+          "tuning": {
+            "hand": "RightHand"
+          }
+        },
+        {
+          "art": "pieces/p2.png",
+          "model": "models/p2.glb"
+        },
+        {
+          "art": "pieces/p3.png",
+          "model": "models/p3.glb"
+        },
+        {
+          "art": "pieces/p4.png",
+          "model": "models/p4.glb"
+        }
+      ]
+    }
+  }
+}

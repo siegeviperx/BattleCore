@@ -10,6 +10,8 @@ const DEFAULT_POLAR = Math.atan2(8.5, 9);
 const BASE_DIST = Math.hypot(8.5, 9);
 /** Half-width (world units) that must fit horizontally. */
 const HALF_WIDTH = 5.0;
+/** Half-depth (world units) that must fit vertically: all eight ranks, so the near one never drops off-screen. */
+const HALF_DEPTH = 4.3;
 /** Scripted shots (intro, fights) are framed for a 16:9 screen. Narrower screens widen the lens up to
  *  MAX_SHOT_FOV and pull the camera back for the rest, so each shot keeps its width on a phone. */
 const SHOT_ASPECT = 16 / 9;
@@ -66,13 +68,18 @@ export class CameraRig {
     return side === 'w' ? 0 : Math.PI;
   }
 
-  /** Distance that fits the board's width into the area the HUD leaves free. */
+  /** Distance that fits the board's width, and its depth, into the area the HUD leaves free. */
   fitDistance(): number {
     const { w, h } = this.size;
     const freeW = Math.max(1, w - this.insets.left - this.insets.right);
+    const freeH = Math.max(1, h - this.insets.top - this.insets.bottom);
     const vHalf = THREE.MathUtils.degToRad(FOV / 2);
     const hHalf = Math.atan((Math.tan(vHalf) * freeW) / h);
-    return Math.max(BASE_DIST, HALF_WIDTH / Math.tan(hHalf) + 2.5);
+    // Short screens (phone landscape, or a tall coach card): the near rank, closest to the camera, sits lowest and
+    // falls off first. It fits when HALF_DEPTH·cos(polar) / (r − HALF_DEPTH·sin(polar)) ≤ tan of the free half-angle.
+    const tFree = (Math.tan(vHalf) * freeH) / h;
+    const depthFit = HALF_DEPTH * (Math.sin(DEFAULT_POLAR) + Math.cos(DEFAULT_POLAR) / tFree);
+    return Math.max(BASE_DIST, HALF_WIDTH / Math.tan(hHalf) + 2.5, depthFit);
   }
 
   setViewport(w: number, h: number): void {
@@ -136,7 +143,8 @@ export class CameraRig {
         0.8,
         (t) => {
           if (this.side !== mySide) return;
-          this.place(from.theta + dTheta * t, from.phi + (DEFAULT_POLAR - from.phi) * t, from.r + (fit - from.r) * t);
+          // Re-fit every frame: HUD insets that change mid-swing (the lesson coach card appearing) still count.
+          this.place(from.theta + dTheta * t, from.phi + (DEFAULT_POLAR - from.phi) * t, from.r + (this.fitDistance() - from.r) * t);
         },
         { ease: ease.inOutCubic },
       )

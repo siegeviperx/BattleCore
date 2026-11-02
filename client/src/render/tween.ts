@@ -62,7 +62,14 @@ export class Tweener {
       if (nowSec < it.start) continue;
       it.started = true;
       const raw = Math.min(1, (nowSec - it.start) / it.duration);
-      it.update(it.ease(raw));
+      try {
+        it.update(it.ease(raw));
+      } catch (err) {
+        // A tween that throws would throw every frame and its awaiter would wait forever: end it now.
+        console.error(err);
+        done.push(it);
+        continue;
+      }
       if (raw >= 1) done.push(it);
     }
     if (done.length) {

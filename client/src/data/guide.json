@@ -3,7 +3,7 @@
     {
       "title": "The Goal",
       "paras": [
-        "Chess is a battle between two armies of 16 pieces. The {w.k} leads the Baby Army (white) and the {b.k} leads the Armored Dinos (black).",
+        "Chess is a battle between two armies of 16 pieces. The {w.k} leads the {w.army} (white) and the {b.k} leads the {b.army} (black).",
         "You win by **checkmate**: trapping the enemy king so it is attacked and has no way to escape.",
         "White moves first, then players take turns, one move each. To **capture**, move onto a square holding an enemy piece. The two pieces fight it out, and yours takes the square."
       ]

@@ -14,11 +14,11 @@ export interface BoardPiece {
   square: Square;
   color: Color;
   type: PieceType;
-  /** Art variant (see core/looks.ts); 0 or absent = default. */
+  /** Art variant (index into the pack piece's looks); 0 or absent = default. */
   look?: number;
 }
 
-/** Everything the renderer needs to animate one move. Produced by the app controller from a chess.js move. */
+/** Everything the renderer needs to animate one move. Produced by core/game.ts from a rules move. */
 export interface MoveAnim {
   from: Square;
   to: Square;

@@ -1,6 +1,5 @@
-// Transport-agnostic room / game logic. The server owns the only authoritative chess.js
-// instance per room; clients only send intents.
-import { Chess, DEFAULT_POSITION } from 'chess.js';
+// Transport-agnostic room / game logic. The server owns the only authoritative game per room (the shared rules
+// engine, the same one the client runs); clients only send intents.
 import { randomBytes, randomInt } from 'node:crypto';
 import {
   RECONNECT_GRACE_MS,
@@ -16,6 +15,7 @@ import type {
   Side,
   Snapshot,
 } from '../../shared/protocol.ts';
+import { ChessGame, START_FEN } from '../../shared/rules/game.ts';
 
 /** One connected client, as seen by the room logic. */
 export interface Peer {
@@ -27,6 +27,8 @@ export interface Peer {
 interface Player {
   side: Side;
   name: string | null;
+  /** Chosen army (pack id), or null for the client's default. Follows the player when sides swap. */
+  army: string | null;
   token: string;
   peer: Peer | null;
   graceTimer: ReturnType<typeof setTimeout> | null;
@@ -38,7 +40,7 @@ const other = (s: Side): Side => (s === 'w' ? 'b' : 'w');
 
 export class Room {
   readonly code: string;
-  chess = new Chess();
+  chess = new ChessGame();
   moves: string[] = [];
   players: Player[] = [];
   started = false;
@@ -66,7 +68,7 @@ export class Room {
     return {
       code: this.code,
       you: p.side,
-      startFen: DEFAULT_POSITION,
+      startFen: START_FEN,
       moves: [...this.moves],
       opponentConnected: !!opp?.peer,
       started: this.started,
@@ -74,6 +76,10 @@ export class Room {
       drawOffered: opp !== null && this.drawOfferFrom === opp.side,
       youName: p.name,
       opponentName: opp?.name ?? null,
+      armies: {
+        w: this.players.find((x) => x.side === 'w')?.army ?? null,
+        b: this.players.find((x) => x.side === 'b')?.army ?? null,
+      },
     };
   }
 
@@ -106,9 +112,9 @@ export class RoomManager {
       case 'ping':
         return; // handled by the transport
       case 'create':
-        return this.create(peer, msg.side === 'random' ? (randomInt(2) ? 'w' : 'b') : msg.side, msg.name);
+        return this.create(peer, msg.side === 'random' ? (randomInt(2) ? 'w' : 'b') : msg.side, msg.name, msg.army);
       case 'join':
-        return this.join(peer, msg.code, msg.name);
+        return this.join(peer, msg.code, msg.name, msg.army);
       case 'resume':
         return this.resume(peer, msg.code, msg.token);
     }
@@ -154,22 +160,22 @@ export class RoomManager {
 
   // --- lobby ---------------------------------------------------------------
 
-  private create(peer: Peer, side: Side, name?: string): void {
+  private create(peer: Peer, side: Side, name?: string, army?: string): void {
     if (this.seats.has(peer)) return err(peer, 'bad-request', 'Already in a room');
     const room = new Room(this.newCode());
     this.rooms.set(room.code, room);
-    const player = this.addPlayer(room, peer, side, name);
+    const player = this.addPlayer(room, peer, side, name, army);
     peer.send({ t: 'seated', code: room.code, token: player.token, you: side });
     room.sendSnapshot(player);
   }
 
-  private join(peer: Peer, rawCode: string, name?: string): void {
+  private join(peer: Peer, rawCode: string, name?: string, army?: string): void {
     if (this.seats.has(peer)) return err(peer, 'bad-request', 'Already in a room');
     const room = this.rooms.get(normCode(rawCode));
     if (!room) return err(peer, 'room-not-found', 'No room with that code');
     const host = room.players[0];
     if (room.started || room.players.length !== 1 || !host) return err(peer, 'room-full', 'Room is full');
-    const player = this.addPlayer(room, peer, other(host.side), name);
+    const player = this.addPlayer(room, peer, other(host.side), name, army);
     room.started = true;
     peer.send({ t: 'seated', code: room.code, token: player.token, you: player.side });
     room.sendSnapshot(player);
@@ -209,28 +215,21 @@ export class RoomManager {
     };
     if (!room.started) return fail('bad-request', 'Game has not started');
     if (room.result) return fail('game-over', 'Game is over');
-    if (room.chess.turn() !== player.side) return fail('not-your-turn', 'Not your turn');
+    if (room.chess.turn !== player.side) return fail('not-your-turn', 'Not your turn');
     if (ply !== room.moves.length) return fail('bad-request', `Stale ply ${ply}, expected ${room.moves.length}`);
-    const m = UCI_RE.exec(uci);
-    if (!m) return fail('illegal-move', `Malformed move ${uci}`);
-    const [, from, to, promo] = m;
-    const legal = room.chess
-      .moves({ verbose: true })
-      .find((x) => x.from === from && x.to === to && (x.promotion ?? undefined) === promo);
-    if (!legal) return fail('illegal-move', `Illegal move ${uci}`);
-    const done = room.chess.move({ from: legal.from, to: legal.to, promotion: legal.promotion });
+    if (!UCI_RE.test(uci)) return fail('illegal-move', `Malformed move ${uci}`);
+    const done = room.chess.move(uci);
+    if (!done) return fail('illegal-move', `Illegal move ${uci}`);
     room.moves.push(uci);
     room.drawOfferFrom = null;
     room.broadcast({ t: 'moved', uci, san: done.san, ply: room.moves.length - 1 });
 
-    const c = room.chess;
-    let result: GameResult | null = null;
-    if (c.isCheckmate()) result = { winner: player.side, reason: 'checkmate' };
-    else if (c.isStalemate()) result = { winner: 'draw', reason: 'stalemate' };
-    else if (c.isInsufficientMaterial()) result = { winner: 'draw', reason: 'insufficient' };
-    else if (c.isThreefoldRepetition()) result = { winner: 'draw', reason: 'repetition' };
-    else if (c.isDrawByFiftyMoves()) result = { winner: 'draw', reason: 'fifty-move' };
-    if (result) this.finish(room, result);
+    const outcome = room.chess.outcome();
+    if (outcome.over) {
+      const result: GameResult =
+        outcome.reason === 'checkmate' ? { winner: outcome.winner, reason: 'checkmate' } : { winner: 'draw', reason: outcome.reason };
+      this.finish(room, result);
+    }
   }
 
   private requireActive(room: Room, player: Player): boolean {
@@ -269,7 +268,7 @@ export class RoomManager {
       opp.peer?.send({ t: 'rematchOffered' });
       return;
     }
-    room.chess = new Chess();
+    room.chess = new ChessGame();
     room.moves = [];
     room.result = null;
     room.drawOfferFrom = null;
@@ -289,10 +288,11 @@ export class RoomManager {
 
   // --- seats / lifecycle ---------------------------------------------------
 
-  private addPlayer(room: Room, peer: Peer, side: Side, name?: string): Player {
+  private addPlayer(room: Room, peer: Peer, side: Side, name?: string, army?: string): Player {
     const player: Player = {
       side,
       name: cleanName(name ?? '') || null,
+      army: army ?? null,
       token: randomBytes(24).toString('base64url'),
       peer,
       graceTimer: null,

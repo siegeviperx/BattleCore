@@ -1,5 +1,6 @@
 // Procedural attack and knockout clips, picked by kind from data/fights.json. Each piece has one of each,
 // so 12 attacks + 12 knockouts cover every matchup. Moves only touch fighter.body (local space, +Z = opponent).
+import type { AttackKind, KnockoutKind } from './move-kinds';
 import * as THREE from 'three';
 import { sfx } from '../audio';
 import { ease, type Tweener } from '../render/tween';
@@ -281,8 +282,7 @@ const breath: AttackFn = async (c) => {
   await tween(c, 0.15, (t) => (a.rotation.x = -0.15 * (1 - t)));
 };
 
-export const ATTACKS = { burst, snipe, pounce, charge, dive, volley, twirl, breath } satisfies Record<string, AttackFn>;
-export type AttackKind = keyof typeof ATTACKS;
+export const ATTACKS = { burst, snipe, pounce, charge, dive, volley, twirl, breath } satisfies Record<AttackKind, AttackFn>;
 
 // ---------------------------------------------------------------------------
 // Knockouts (defender's local +Z faces the attacker, so "back" is -Z)
@@ -349,5 +349,4 @@ const flatten: KnockoutFn = async (c) => {
   await dizzyStars(c.defender.root, c.tw, 0.2, c.T(0.7));
 };
 
-export const KNOCKOUTS = { pratfall, spinout, launch, topple, flatten } satisfies Record<string, KnockoutFn>;
-export type KnockoutKind = keyof typeof KNOCKOUTS;
+export const KNOCKOUTS = { pratfall, spinout, launch, topple, flatten } satisfies Record<KnockoutKind, KnockoutFn>;

@@ -1,0 +1,148 @@
+{
+  "id": "dragons",
+  "version": 1,
+  "name": "Dragon Clans",
+  "short": "Dragons",
+  "colors": {
+    "primary": "#1f6b63",
+    "secondary": "#d9a93a",
+    "base": "#203a3a",
+    "emblem": "star"
+  },
+  "credits": [
+    {
+      "role": "3D models & art",
+      "name": "Meshy AI"
+    }
+  ],
+  "pieces": {
+    "k": {
+      "name": "Elder Wyrm",
+      "icon": "🐉",
+      "attack": {
+        "kind": "breath"
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {
+          "art": "pieces/k.png",
+          "model": "models/k.glb"
+        }
+      ]
+    },
+    "q": {
+      "name": "Storm Queen",
+      "icon": "⚡",
+      "attack": {
+        "kind": "volley",
+        "count": 3,
+        "projectile": "ball",
+        "color": "#7fd3ff",
+        "arc": 0.6
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {
+          "art": "pieces/q.png",
+          "model": "models/q.glb"
+        }
+      ]
+    },
+    "r": {
+      "name": "Dragon Roost",
+      "icon": "🗼",
+      "attack": {
+        "kind": "volley",
+        "count": 2,
+        "projectile": "ball",
+        "color": "#ff7a1a",
+        "arc": 1.2,
+        "windup": "roar"
+      },
+      "knockout": {
+        "kind": "topple"
+      },
+      "looks": [
+        {
+          "art": "pieces/r.png",
+          "model": "models/r.glb"
+        }
+      ]
+    },
+    "b": {
+      "name": "Wyvern Sage",
+      "icon": "🧙",
+      "attack": {
+        "kind": "snipe"
+      },
+      "knockout": {
+        "kind": "spinout"
+      },
+      "looks": [
+        {
+          "art": "pieces/b.png",
+          "model": "models/b.glb"
+        }
+      ]
+    },
+    "n": {
+      "name": "Wyvern Rider",
+      "icon": "🪽",
+      "attack": {
+        "kind": "dive",
+        "strafe": {
+          "shots": 4,
+          "projectile": "dart",
+          "color": "#ffd166"
+        }
+      },
+      "knockout": {
+        "kind": "launch"
+      },
+      "looks": [
+        {
+          "tuning": {
+            "flier": false
+          },
+          "art": "pieces/n.png",
+          "model": "models/n.glb"
+        }
+      ]
+    },
+    "p": {
+      "name": "Hatchling",
+      "icon": "🥚",
+      "attack": {
+        "kind": "burst",
+        "shots": 3,
+        "projectile": "dart",
+        "color": "#ffd166"
+      },
+      "knockout": {
+        "kind": "pratfall"
+      },
+      "looks": [
+        {
+          "art": "pieces/p.png",
+          "model": "models/p.glb"
+        },
+        {
+          "art": "pieces/p2.png",
+          "model": "models/p2.glb"
+        },
+        {
+          "art": "pieces/p3.png",
+          "model": "models/p3.glb"
+        },
+        {
+          "art": "pieces/p4.png",
+          "model": "models/p4.glb"
+        }
+      ]
+    }
+  }
+}

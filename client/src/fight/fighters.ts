@@ -2,7 +2,7 @@
 // behind the same Fighter shape (root/body/muzzle/flash), so the moves and director don't change.
 import * as THREE from 'three';
 import type { Color, PieceType } from '../core/types';
-import data from '../data/pieces.json';
+import { army } from '../packs';
 import { cloneFighterModel, modelTuning, type ClipName, type FighterModel, type ModelTuning } from './models';
 
 export interface Fighter {
@@ -184,7 +184,7 @@ function swapInModel(f: ToyFighter, { object: model, clips }: FighterModel, tune
 
 function buildBaby(f: ToyFighter, type: PieceType): void {
   const k = f.kit;
-  const fac = data.factions.w;
+  const fac = army('w').colors;
   const skin = k.mat(SKIN, 0.55);
   const olive = k.mat(fac.primary, 0.5);
   const tan = k.mat(fac.secondary, 0.6);
@@ -321,7 +321,7 @@ function buildBlockTower(f: ToyFighter, olive: THREE.Material, tan: THREE.Materi
 
 function buildDino(f: ToyFighter, type: PieceType): void {
   const k = f.kit;
-  const fac = data.factions.b;
+  const fac = army('b').colors;
   const skin = k.mat(DINO_SKIN, 0.6);
   const belly = k.mat(DINO_BELLY, 0.65);
   const steel = k.mat(STEEL, 0.35, 0.7);
