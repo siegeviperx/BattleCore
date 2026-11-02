@@ -126,6 +126,8 @@ export class Controller {
   private newGame(fen?: string): void {
     this.stopAi();
     this.forfeited = false;
+    this.animQueue = Promise.resolve();
+    this.animating = false;
     this.game = new Game(fen);
     this.clearSelection();
     this.board.setPosition(this.game.pieces());
@@ -206,21 +208,32 @@ export class Controller {
     const played = this.game.move(from, to, promotion);
     this.clearSelection();
     if (!played) return;
-    if (this.lesson && !this.lessonAccepts(played)) return;
+    if (this.lesson) {
+      this.lessonMove(played); // plays it if it's the lesson's move
+      return;
+    }
     // Online: apply locally right away; the server's echo of this move is ignored as an ack.
     this.online?.net.send({ t: 'move', uci: played.uci, ply: this.game.ply - 1 });
     await this.play(played);
   }
 
   private play(played: PlayedMove): Promise<void> {
-    this.animQueue = this.animQueue.then(async () => {
-      this.animating = true;
-      this.hud.setUndoEnabled(false);
-      this.board.setCheck(null);
-      await this.board.animateMove(played.anim);
-      this.animating = false;
-      this.afterMove();
-    });
+    this.animQueue = this.animQueue
+      .then(async () => {
+        this.animating = true;
+        this.hud.setUndoEnabled(false);
+        this.board.setCheck(null);
+        try {
+          await this.board.animateMove(played.anim);
+        } catch (err) {
+          // A broken animation must never freeze the game: snap the board to the real position and carry on.
+          console.error(err);
+          this.board.setPosition(this.game.pieces());
+        }
+        this.animating = false;
+        this.afterMove();
+      })
+      .catch((err) => console.error(err)); // a rejected queue would silently swallow every later move
     return this.animQueue;
   }
 
@@ -281,6 +294,9 @@ export class Controller {
         this.hud.setThinking(false);
         console.error(err);
         this.hud.showBanner('AI malfunction!', 'info');
+        // Never leave the player waiting on a broken engine: the AI plays any legal move instead.
+        const fallback = this.game.randomMove();
+        if (fallback) await this.play(fallback);
       }
     }
   }
@@ -382,15 +398,15 @@ export class Controller {
     run.busy = false;
   }
 
-  /** Checks a legal move the student just made against the lesson. Wrong moves are taken back. */
-  private lessonAccepts(played: PlayedMove): boolean {
+  /** Checks a legal move the student just made against the lesson: plays it if right, takes it back if wrong. */
+  private lessonMove(played: PlayedMove): void {
     const run = this.lesson!;
     const step = run.lesson.steps[run.step];
     if (step.accept.includes(played.uci)) {
       run.busy = true;
       if (run.step < run.lesson.steps.length - 1) this.coach(run, 'good', lessonText(step.praise ?? 'Nice move!'));
       void this.play(played).then(() => this.lessonStepDone(run));
-      return true;
+      return;
     }
     this.game.undo();
     sfx('undo');
@@ -400,7 +416,6 @@ export class Controller {
     window.setTimeout(() => {
       if (this.lesson === run && run.token === token && run.step === step0 && !run.busy) this.coach(run, 'task', lessonText(step.say));
     }, LESSON_OOPS_MS);
-    return false;
   }
 
   private async lessonStepDone(run: LessonRun): Promise<void> {

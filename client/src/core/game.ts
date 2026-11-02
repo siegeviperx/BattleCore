@@ -86,6 +86,13 @@ export class Game {
     return m ? { san: m.san, uci: m.uci, anim: toAnim(m) } : null;
   }
 
+  /** Play a random legal move (the AI's fallback if its engine fails); null if there are none. */
+  randomMove(): PlayedMove | null {
+    const moves = this.chess.moves();
+    if (moves.length === 0) return null;
+    return this.moveUci(moves[Math.floor(Math.random() * moves.length)].uci);
+  }
+
   undo(): boolean {
     return this.chess.undo() !== null;
   }
