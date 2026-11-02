@@ -85,6 +85,8 @@ export interface Hud {
   setCinematic(on: boolean): void;
   /** Show the name tag for the piece under the mouse at client (x, y), or hide it with null. */
   showPieceTip(tip: PieceTip | null, x?: number, y?: number): void;
+  /** Brief "hover or hold a piece" hint at the start of a game, until the player has used the name tag once. */
+  showPieceHint(): void;
   /** Fires when the screen area covered by the HUD changes (resize, panel layout, HUD hidden for a cutscene). */
   onInsetsChange(cb: (insets: ScreenInsets) => void): void;
   /** Title card: shows "Loading" until `ready` settles, then waits for a tap or key press (which also lets the browser start audio). */

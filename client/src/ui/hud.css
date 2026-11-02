@@ -492,6 +492,27 @@
   color: #a8d68a;
 }
 
+.bc-piece-hint {
+  max-width: 100%;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--bc-steel-edge);
+  background: rgba(24, 22, 19, 0.88);
+  color: var(--bc-ink-dim);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  animation: bc-piece-hint-in 300ms ease both;
+}
+
+.bc-piece-hint[hidden] {
+  display: none;
+}
+
+@keyframes bc-piece-hint-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
 /* Speaker / quick mute (top-left) */
 .bc-mute {
   position: absolute;

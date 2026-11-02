@@ -134,6 +134,7 @@ export class Controller {
     this.setView(this.humanSide() ?? 'w', true);
     this.refreshHud();
     audio.music('battle');
+    this.hud.showPieceHint();
     void this.maybeAiMove();
   }
 
@@ -602,6 +603,7 @@ export class Controller {
     this.hud.setOpponentStatus(s.opponentConnected ? 'connected' : 'disconnected', other(s.you), session.opponentName);
     if (s.moves.length === 0) {
       this.hud.showBanner(s.you === 'w' ? 'You move first!' : 'Enemy moves first', 'info');
+      this.hud.showPieceHint();
     }
     if (s.drawOffered) this.onServerMessage(session, { t: 'drawOffered' });
   }

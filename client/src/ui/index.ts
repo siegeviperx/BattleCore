@@ -74,6 +74,9 @@ const ROLE_NAMES: Record<PieceType, string> = { p: 'Pawn', n: 'Knight', b: 'Bish
 const PROMO_ORDER: PieceType[] = ['q', 'r', 'b', 'n'];
 const PROMO_KEYS: Record<string, PieceType> = { q: 'q', r: 'r', b: 'b', n: 'n' };
 const STORAGE_KEY = 'battlecore.menu.v1';
+/** Set once the player has seen a piece name tag, which retires the "hover or hold" hint. */
+const PIECE_TIP_KEY = 'battlecore.pieceTip.v1';
+const PIECE_HINT_MS = 8_000;
 /** Room code alphabet (no 0/O, 1/I/L to avoid mix-ups). */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 6;
@@ -351,7 +354,9 @@ export function createHud(root: HTMLElement): Hud {
     coachText,
     el('div', 'bc-coach__actions', undefined, coachBtn('hint', 'Hint'), coachBtn('restart', 'Restart'), coachBtn('guide', 'Rules')),
   );
-  const topBar = el('div', 'bc-top', undefined, turnPill, oppChip, coach);
+  // Nudge toward the piece name tag; shown each game until the player has used it once.
+  const pieceHint = el('div', 'bc-piece-hint', { role: 'status', hidden: true }, 'Hover or hold a piece to see what it is');
+  const topBar = el('div', 'bc-top', undefined, turnPill, oppChip, coach, pieceHint);
 
   // ----- Speaker (quick mute) -----
   const muteBtn = button('bc-mute', [], () => audio.setMuted(!audio.muted));
@@ -486,6 +491,28 @@ export function createHud(root: HTMLElement): Hud {
     toolbar,
   );
 
+  // ----- Piece hint (until the hover tag has been used once) -----
+  let pieceTipUsed = ((): boolean => {
+    try {
+      return localStorage.getItem(PIECE_TIP_KEY) === '1';
+    } catch {
+      return false;
+    }
+  })();
+  let pieceHintTimer = 0;
+
+  function hidePieceHint(): void {
+    window.clearTimeout(pieceHintTimer);
+    pieceHint.hidden = true;
+  }
+
+  function showPieceHint(): void {
+    if (pieceTipUsed) return;
+    window.clearTimeout(pieceHintTimer);
+    pieceHint.hidden = false;
+    pieceHintTimer = window.setTimeout(hidePieceHint, PIECE_HINT_MS);
+  }
+
   // ----- Piece hover tag -----
   const tipName = el('span', 'bc-tip__name');
   const tipRole = el('span', 'bc-tip__role');
@@ -495,6 +522,15 @@ export function createHud(root: HTMLElement): Hud {
     if (!tip) {
       pieceTip.hidden = true;
       return;
+    }
+    if (!pieceTipUsed) {
+      pieceTipUsed = true;
+      try {
+        localStorage.setItem(PIECE_TIP_KEY, '1');
+      } catch {
+        // storage blocked: the hint just comes back next game
+      }
+      hidePieceHint();
     }
     const info = PIECES[tip.color][tip.type];
     tipName.textContent = `${info.icon} ${info.name}`;
@@ -1790,6 +1826,7 @@ export function createHud(root: HTMLElement): Hud {
     setMoves,
     setCaptured,
     showBanner,
+    showPieceHint,
     showGameOver,
     choosePromotion,
     setThinking,
